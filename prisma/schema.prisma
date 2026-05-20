@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum NormalSide {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  VOIDED
+}
+
+enum BillStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  VOIDED
+}
+
+model Association {
+  id              String    @id @default(cuid())
+  name            String
+  registrationNo  String?
+  address         String?
+  currency        String    @default("RM")
+  fiscalYearStart Int       @default(1)
+  lockedThrough   DateTime?
+  createdAt       DateTime  @default(now())
+
+  accounts  Account[]
+  entries   JournalEntry[]
+  residents Resident[]
+  suppliers Supplier[]
+  charges   Charge[]
+  receipts  Receipt[]
+  bills     Bill[]
+  users     User[]
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  passwordHash  String
+  name          String
+  role          String      @default("admin")
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  createdAt     DateTime    @default(now())
+}
+
+model Account {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  code          String
+  name          String
+  type          AccountType
+  normalSide    NormalSide
+  parentId      String?
+  parent        Account?    @relation("AccountTree", fields: [parentId], references: [id])
+  children      Account[]   @relation("AccountTree")
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  lines JournalLine[]
+
+  @@unique([associationId, code])
+  @@index([associationId, type])
+}
+
+model JournalEntry {
+  id            String        @id @default(cuid())
+  associationId String
+  association   Association   @relation(fields: [associationId], references: [id])
+  entryNo       String
+  date          DateTime
+  description   String
+  reference     String?
+  status        JournalStatus @default(DRAFT)
+  source        String        @default("manual")
+  sourceId      String?
+  reversesId    String?       @unique
+  reverses      JournalEntry? @relation("Reversal", fields: [reversesId], references: [id])
+  reversedBy    JournalEntry? @relation("Reversal")
+  postedAt      DateTime?
+  postedBy      String?
+  voidedAt      DateTime?
+  voidReason    String?
+  createdAt     DateTime      @default(now())
+
+  lines JournalLine[]
+
+  @@unique([associationId, entryNo])
+  @@index([associationId, date])
+  @@index([associationId, status])
+}
+
+model JournalLine {
+  id        String       @id @default(cuid())
+  entryId   String
+  entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId String
+  account   Account      @relation(fields: [accountId], references: [id])
+  debit     Decimal      @default(0) @db.Decimal(15, 2)
+  credit    Decimal      @default(0) @db.Decimal(15, 2)
+  memo      String?
+  lineNo    Int
+
+  @@index([accountId])
+  @@index([entryId])
+}
+
+model Resident {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  unitAddress   String
+  ownerName     String
+  phone         String?
+  monthlyFee    Decimal     @default(0) @db.Decimal(15, 2)
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  charges  Charge[]
+  receipts Receipt[]
+
+  @@unique([associationId, unitAddress])
+}
+
+model Charge {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  residentId    String
+  resident      Resident    @relation(fields: [residentId], references: [id])
+  periodMonth   Int
+  periodYear    Int
+  amount        Decimal     @db.Decimal(15, 2)
+  description   String
+  date          DateTime
+  voided        Boolean     @default(false)
+  entryId       String?
+  createdAt     DateTime    @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@index([residentId])
+}
+
+model Receipt {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  receiptNo     String
+  residentId    String
+  resident      Resident    @relation(fields: [residentId], references: [id])
+  date          DateTime
+  amount        Decimal     @db.Decimal(15, 2)
+  method        String
+  bankRef       String?
+  entryId       String?
+  voided        Boolean     @default(false)
+  voidReason    String?
+  createdAt     DateTime    @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@unique([associationId, receiptNo])
+  @@index([residentId])
+}
+
+model PaymentAllocation {
+  id        String  @id @default(cuid())
+  receiptId String
+  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  chargeId  String
+  charge    Charge  @relation(fields: [chargeId], references: [id])
+  amount    Decimal @db.Decimal(15, 2)
+}
+
+model Supplier {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  name          String
+  contact       String?
+  phone         String?
+  bankAccount   String?
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  bills Bill[]
+}
+
+model Bill {
+  id               String      @id @default(cuid())
+  associationId    String
+  association      Association @relation(fields: [associationId], references: [id])
+  supplierId       String
+  supplier         Supplier    @relation(fields: [supplierId], references: [id])
+  invoiceNo        String
+  date             DateTime
+  dueDate          DateTime?
+  amount           Decimal     @db.Decimal(15, 2)
+  paid             Decimal     @default(0) @db.Decimal(15, 2)
+  expenseAccountId String
+  status           BillStatus  @default(UNPAID)
+  entryId          String?
+  createdAt        DateTime    @default(now())
+
+  payments BillPayment[]
+
+  @@index([supplierId])
+}
+
+model BillPayment {
+  id      String   @id @default(cuid())
+  billId  String
+  bill    Bill     @relation(fields: [billId], references: [id])
+  date    DateTime
+  amount  Decimal  @db.Decimal(15, 2)
+  bankRef String?
+  entryId String?
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  entity    String
+  entityId  String
+  action    String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}

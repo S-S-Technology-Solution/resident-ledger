@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Brand: deep emerald — reads "money / accounting" */
+  --primary: oklch(0.45 0.13 165);          /* emerald 700 */
+  --primary-foreground: oklch(0.985 0 0);
+
+  --background: oklch(0.985 0.003 180);     /* very soft mint-tinted white */
+  --foreground: oklch(0.18 0.02 240);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 240);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 240);
+
+  --secondary: oklch(0.96 0.01 180);
+  --secondary-foreground: oklch(0.22 0.02 240);
+
+  --muted: oklch(0.96 0.005 240);
+  --muted-foreground: oklch(0.42 0.02 240);
+
+  --accent: oklch(0.95 0.025 165);
+  --accent-foreground: oklch(0.3 0.08 165);
+
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.92 0.005 240);
+  --input: oklch(0.92 0.005 240);
+  --ring: oklch(0.45 0.13 165 / 0.4);
+
+  /* Sidebar — slightly darker than canvas with brand tint */
+  --sidebar: oklch(0.22 0.03 195);
+  --sidebar-foreground: oklch(0.95 0.01 180);
+  --sidebar-primary: oklch(0.62 0.16 165);
+  --sidebar-primary-foreground: oklch(0.13 0.02 195);
+  --sidebar-accent: oklch(0.28 0.04 195);
+  --sidebar-accent-foreground: oklch(0.98 0.005 180);
+  --sidebar-border: oklch(0.32 0.04 195);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-feature-settings: "tnum" on, "lnum" on;     /* tabular numerals for $ */
+}
+
+/* tabular helper for money columns */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+
+/* Table polish: zebra + hover + sticky head — opt-in via .rl-table on the wrapper */
+.rl-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  z-index: 1;
+  border-bottom: 1px solid var(--border);
+}
+.rl-table tbody tr:nth-child(even) td { background: color-mix(in oklab, var(--muted) 35%, transparent); }
+.rl-table tbody tr:hover td { background: color-mix(in oklab, var(--accent) 50%, transparent); }
+
+/* Print rules */
+@media print {
+  @page { size: A4; margin: 15mm; }
+  .no-print, header.no-print, nav, aside, [data-sonner-toaster] { display: none !important; }
+  body { background: white !important; }
+  main { max-width: none !important; padding: 0 !important; }
+  .print-receipt { box-shadow: none !important; border: 0 !important; }
+  .print-receipt > header {
+    background: white !important;
+    background-image: none !important;
+    color: #065f46 !important;
+    border-bottom: 2px solid #065f46;
+  }
+  .print-receipt .void-watermark {
+    z-index: 50 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-receipt .void-watermark::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* VOID watermark for printed receipts */
+.void-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 50;
+}
+.void-watermark::after {
+  content: "VOID";
+  font-size: 9rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: oklch(0.58 0.22 25 / 0.18);
+  transform: rotate(-22deg);
+  border: 0.5rem solid oklch(0.58 0.22 25 / 0.18);
+  padding: 0.5rem 2rem;
+  border-radius: 0.5rem;
+}
