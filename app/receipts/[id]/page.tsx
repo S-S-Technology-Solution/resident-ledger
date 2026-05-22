@@ -22,6 +22,18 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-4">
+      <style>{`
+        @media print {
+          @page { size: A5 portrait; margin: 8mm; }
+          html, body { font-size: 11px; }
+          .print-receipt { max-width: none !important; border-radius: 0 !important; }
+          .print-receipt > header { padding: 12px 16px !important; }
+          .print-receipt > header .h-14 { height: 2.25rem !important; width: 2.25rem !important; font-size: 1rem !important; }
+          .print-receipt section, .print-receipt > div { padding: 10px 16px !important; }
+          .print-receipt table { font-size: 10px !important; }
+          .print-receipt h1, .print-receipt h2 { font-size: 1rem !important; }
+        }
+      `}</style>
       <div className="flex items-center justify-between no-print">
         <div>
           <h1 className="text-2xl font-semibold">Receipt {receipt.receiptNo}</h1>
