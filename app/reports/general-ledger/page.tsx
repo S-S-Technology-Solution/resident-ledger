@@ -7,8 +7,10 @@ import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
+import { Empty } from "@/components/empty";
 import { AccountPicker } from "./account-picker";
 import { format } from "date-fns";
+import { BookOpen } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +86,9 @@ export default async function GLPage({
           </Table>
         </DataCard>
       ) : (
-        <p className="text-sm text-muted-foreground">Pick an account above to view its ledger.</p>
+        <DataCard>
+          <Empty icon={BookOpen} title="Pick an account" description="Select an account from the picker above to view its ledger." />
+        </DataCard>
       )}
     </div>
   );

@@ -82,7 +82,7 @@ export default async function ReceiptsPage({
           <TableBody>
             {receipts.map((r) => (
               <TableRow key={r.id}>
-                <TableCell>{format(r.date, "yyyy-MM-dd")}</TableCell>
+                <TableCell>{format(r.date, "dd MMM yyyy")}</TableCell>
                 <TableCell className="font-mono">{r.receiptNo}</TableCell>
                 <TableCell className="font-medium">{r.resident.unitAddress}</TableCell>
                 <TableCell className="text-muted-foreground">{r.resident.ownerName}</TableCell>

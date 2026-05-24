@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { JournalEditor } from "../journal-editor";
 import { format } from "date-fns";
 import { VoidButton } from "./void-button";
+import { PageHeader } from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -24,17 +25,24 @@ export default async function ViewJournalPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Entry {entry.entryNo}</h1>
-          <div className="text-sm text-slate-500 flex items-center gap-2">
+      <PageHeader
+        title={`Entry ${entry.entryNo}`}
+        description={
+          entry.status === "DRAFT"
+            ? "Draft — not yet posted"
+            : entry.status === "POSTED"
+              ? `Posted on ${format(entry.postedAt!, "dd MMM yyyy")}`
+              : `Voided: ${entry.voidReason ?? "—"}`
+        }
+        actions={
+          <div className="flex items-center gap-2">
             {entry.status === "DRAFT" && <Badge variant="outline">Draft</Badge>}
-            {entry.status === "POSTED" && <Badge>Posted on {format(entry.postedAt!, "yyyy-MM-dd")}</Badge>}
-            {entry.status === "VOIDED" && <Badge variant="destructive">Voided: {entry.voidReason}</Badge>}
+            {entry.status === "POSTED" && <Badge>Posted</Badge>}
+            {entry.status === "VOIDED" && <Badge variant="destructive">Voided</Badge>}
+            {entry.status === "POSTED" && <VoidButton id={entry.id} />}
           </div>
-        </div>
-        {entry.status === "POSTED" && <VoidButton id={entry.id} />}
-      </div>
+        }
+      />
 
       <JournalEditor
         accounts={accounts}

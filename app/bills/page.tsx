@@ -105,7 +105,7 @@ export default async function BillsPage({
               const bal = new Decimal(b.amount.toString()).minus(new Decimal(b.paid.toString()));
               return (
                 <TableRow key={b.id}>
-                  <TableCell>{format(b.date, "yyyy-MM-dd")}</TableCell>
+                  <TableCell>{format(b.date, "dd MMM yyyy")}</TableCell>
                   <TableCell className="font-mono">{b.invoiceNo}</TableCell>
                   <TableCell className="font-medium">{b.supplier.name}</TableCell>
                   <TableCell className="text-right font-mono tabular">{fmtRM(b.amount)}</TableCell>

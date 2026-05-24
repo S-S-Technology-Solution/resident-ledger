@@ -15,7 +15,7 @@ export function VoidChargeButton({ id, size = "sm" }: { id: string; size?: "sm" 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size={size} variant="outline">Void</Button>
+        <Button size={size} variant="destructive">Void</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Void charge</DialogTitle></DialogHeader>

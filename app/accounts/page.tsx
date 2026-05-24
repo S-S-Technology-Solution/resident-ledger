@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { Badge } from "@/components/ui/badge";
@@ -42,15 +43,15 @@ export default async function AccountsPage({
       />
 
       <nav className="flex items-center gap-1 text-sm border-b">
-        <a href="/accounts" className={cn("px-3 py-2 -mb-px border-b-2", !type ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>All</a>
+        <Link href="/accounts" className={cn("px-3 py-2 -mb-px border-b-2", !type ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>All</Link>
         {types.map((t) => (
-          <a
+          <Link
             key={t}
             href={`/accounts?type=${t}`}
             className={cn("px-3 py-2 -mb-px border-b-2 uppercase text-xs tracking-wide", type === t ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}
           >
             {t}
-          </a>
+          </Link>
         ))}
       </nav>
 

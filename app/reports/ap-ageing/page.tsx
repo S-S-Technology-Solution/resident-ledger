@@ -8,6 +8,8 @@ import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
+import { Empty } from "@/components/empty";
+import { FileText } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -93,9 +95,6 @@ export default async function APAgeingPage({
                 </TableCell>
               </TableRow>
             ))}
-            {rows.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No open bills.</TableCell></TableRow>
-            )}
           </TableBody>
           <TableFooter>
             <TableRow>
@@ -112,6 +111,9 @@ export default async function APAgeingPage({
             </TableRow>
           </TableFooter>
         </Table>
+        {rows.length === 0 && (
+          <Empty icon={FileText} title="No open bills" description="All bills are paid or no bills fall within the period." />
+        )}
       </DataCard>
     </div>
   );

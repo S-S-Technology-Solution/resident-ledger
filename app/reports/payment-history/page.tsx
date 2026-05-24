@@ -84,7 +84,7 @@ export default async function PaymentHistoryPage({
               </div>
               <div className="tabular text-right">
                 <div className="text-xs text-muted-foreground">Net paid in period</div>
-                <div className="text-lg font-semibold text-emerald-700">RM {fmtRM(totals.paid)}</div>
+                <div className="text-lg font-mono font-semibold text-emerald-700">RM {fmtRM(totals.paid)}</div>
               </div>
             </div>
           )}
