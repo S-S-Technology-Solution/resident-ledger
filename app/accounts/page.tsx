@@ -12,6 +12,10 @@ import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+function acTypeLabel(t: string) {
+  return t === "INCOME" || t === "EXPENSE" ? "P&L" : "Balance Sheet";
+}
+
 export default async function AccountsPage({
   searchParams,
 }: {
@@ -23,6 +27,7 @@ export default async function AccountsPage({
       associationId: DEFAULT_ASSOCIATION_ID,
       ...(type ? { type: type as "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE" } : {}),
     },
+    include: { parent: true },
     orderBy: { code: "asc" },
   });
 
@@ -53,26 +58,33 @@ export default async function AccountsPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-24">Code</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead className="w-32">Type</TableHead>
-              <TableHead className="w-28">Normal</TableHead>
-              <TableHead className="w-24">Status</TableHead>
-              <TableHead className="w-40 text-right">Actions</TableHead>
+              <TableHead className="w-28">A/C No.</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="w-28">A/C Type</TableHead>
+              <TableHead className="w-36">A/C Group</TableHead>
+              <TableHead className="w-24">Classified As</TableHead>
+              <TableHead className="w-28">Group To A/C</TableHead>
+              <TableHead className="w-20">Status</TableHead>
+              <TableHead className="w-36 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {accounts.map((a) => (
               <TableRow key={a.id}>
-                <TableCell className="font-mono text-muted-foreground">{a.code}</TableCell>
+                <TableCell className="font-mono text-xs">{a.code}</TableCell>
                 <TableCell className="font-medium">{a.name}</TableCell>
-                <TableCell><Badge variant="secondary">{a.type}</Badge></TableCell>
-                <TableCell className="text-muted-foreground text-xs">{a.normalSide}</TableCell>
+                <TableCell className="text-xs">{acTypeLabel(a.type)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{a.group || "—"}</TableCell>
+                <TableCell className="text-xs font-mono">{a.classifiedAs ?? ""}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{a.parent?.code ?? a.code}</TableCell>
                 <TableCell>
                   {a.active ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge>}
                 </TableCell>
                 <TableCell className="text-right space-x-2">
-                  <AccountDialog mode="edit" account={a} />
+                  <AccountDialog mode="edit" account={{
+                    id: a.id, code: a.code, name: a.name, type: a.type, normalSide: a.normalSide,
+                    group: a.group, classifiedAs: a.classifiedAs,
+                  }} />
                   <ToggleButton id={a.id} active={a.active} />
                 </TableCell>
               </TableRow>

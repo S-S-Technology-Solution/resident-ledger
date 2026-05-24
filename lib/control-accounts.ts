@@ -2,11 +2,11 @@ import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 
 const CODES = {
-  AR: "1100",
-  INCOME_FEE: "4000",
-  BANK: "1000",
-  CASH: "1010",
-  AP: "2000",
+  AR: "3000/0000",
+  INCOME_FEE: "5001/0000",
+  BANK: "3300/0000",
+  CASH: "3300/0010",
+  AP: "4010/0000",
 } as const;
 
 export type ControlAccountKey = keyof typeof CODES;

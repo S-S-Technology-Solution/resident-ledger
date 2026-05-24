@@ -71,6 +71,8 @@ model Account {
   name          String
   type          AccountType
   normalSide    NormalSide
+  group         String      @default("")
+  classifiedAs  String?
   parentId      String?
   parent        Account?    @relation("AccountTree", fields: [parentId], references: [id])
   children      Account[]   @relation("AccountTree")

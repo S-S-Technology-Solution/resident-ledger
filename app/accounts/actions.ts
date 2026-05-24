@@ -11,26 +11,23 @@ const upsertSchema = z.object({
   name: z.string().min(1).max(120),
   type: z.enum(["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]),
   normalSide: z.enum(["DEBIT", "CREDIT"]),
+  group: z.string().min(1).max(60),
+  classifiedAs: z.string().max(10).nullable().optional(),
 });
 
 export type UpsertAccountInput = z.infer<typeof upsertSchema>;
 
 export async function upsertAccount(input: UpsertAccountInput) {
   const data = upsertSchema.parse(input);
+  const payload = {
+    name: data.name, code: data.code, type: data.type, normalSide: data.normalSide,
+    group: data.group, classifiedAs: data.classifiedAs ?? null,
+  };
   if (data.id) {
-    await db.account.update({
-      where: { id: data.id },
-      data: { name: data.name, code: data.code, type: data.type, normalSide: data.normalSide },
-    });
+    await db.account.update({ where: { id: data.id }, data: payload });
   } else {
     await db.account.create({
-      data: {
-        associationId: DEFAULT_ASSOCIATION_ID,
-        code: data.code,
-        name: data.name,
-        type: data.type,
-        normalSide: data.normalSide,
-      },
+      data: { associationId: DEFAULT_ASSOCIATION_ID, ...payload },
     });
   }
   revalidatePath("/accounts");

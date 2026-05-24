@@ -45,3 +45,4 @@ next-env.d.ts
 # IDE
 .idea/
 *.iml
+.env*.local
