@@ -67,18 +67,18 @@ export default async function ReconciliationPage({
 
       <form className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Account</label>
+          <label className="block text-xs text-muted-foreground">Account</label>
           <select name="method" defaultValue={method} className="h-9 rounded-md border bg-background px-3 text-sm">
             <option value="BANK">Hong Leong Bank</option>
             <option value="CASH">Cash on hand</option>
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">From</label>
+          <label className="block text-xs text-muted-foreground">From</label>
           <Input type="date" name="from" defaultValue={from ?? ""} />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">To</label>
+          <label className="block text-xs text-muted-foreground">To</label>
           <Input type="date" name="to" defaultValue={to ?? ""} />
         </div>
         <Button type="submit" variant="outline">Apply</Button>
