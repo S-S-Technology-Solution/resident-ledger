@@ -15,6 +15,7 @@ import {
   BarChart3,
   Menu,
   Settings,
+  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -48,6 +49,7 @@ const groups: { title: string; items: Item[] }[] = [
     items: [
       { href: "/accounts", label: "Chart of Accounts", icon: BookOpen },
       { href: "/journal", label: "Journal", icon: ScrollText },
+      { href: "/reconciliation", label: "Bank Reconciliation", icon: Landmark },
     ],
   },
   { title: "Reports", items: [{ href: "/reports", label: "All Reports", icon: BarChart3 }] },

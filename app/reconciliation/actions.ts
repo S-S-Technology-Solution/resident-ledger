@@ -1,0 +1,38 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
+
+export async function setReceiptCleared(id: string, cleared: boolean, statementRef?: string) {
+  await db.receipt.update({
+    where: { id },
+    data: {
+      cleared,
+      clearedAt: cleared ? new Date() : null,
+      statementRef: statementRef ?? undefined,
+    },
+  });
+  revalidatePath("/reconciliation");
+}
+
+export async function setPaymentCleared(id: string, cleared: boolean, statementRef?: string) {
+  await db.billPayment.update({
+    where: { id },
+    data: {
+      cleared,
+      clearedAt: cleared ? new Date() : null,
+      statementRef: statementRef ?? undefined,
+    },
+  });
+  revalidatePath("/reconciliation");
+}
+
+export async function updateReceiptStatementRef(id: string, statementRef: string) {
+  await db.receipt.update({ where: { id }, data: { statementRef: statementRef || null } });
+  revalidatePath("/reconciliation");
+}
+
+export async function updatePaymentStatementRef(id: string, statementRef: string) {
+  await db.billPayment.update({ where: { id }, data: { statementRef: statementRef || null } });
+  revalidatePath("/reconciliation");
+}

@@ -176,6 +176,9 @@ model Receipt {
   method        String
   bankRef       String?
   entryId       String?
+  cleared       Boolean     @default(false)
+  clearedAt     DateTime?
+  statementRef  String?
   voided        Boolean     @default(false)
   voidReason    String?
   createdAt     DateTime    @default(now())
@@ -231,13 +234,17 @@ model Bill {
 }
 
 model BillPayment {
-  id      String   @id @default(cuid())
-  billId  String
-  bill    Bill     @relation(fields: [billId], references: [id])
-  date    DateTime
-  amount  Decimal  @db.Decimal(15, 2)
-  bankRef String?
-  entryId String?
+  id           String    @id @default(cuid())
+  billId       String
+  bill         Bill      @relation(fields: [billId], references: [id])
+  date         DateTime
+  amount       Decimal   @db.Decimal(15, 2)
+  method       String    @default("BANK")
+  bankRef      String?
+  entryId      String?
+  cleared      Boolean   @default(false)
+  clearedAt    DateTime?
+  statementRef String?
 }
 
 model AuditLog {

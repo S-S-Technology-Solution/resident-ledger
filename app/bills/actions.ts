@@ -122,6 +122,7 @@ export async function payBill(input: z.infer<typeof paySchema>) {
         billId: bill.id,
         date: new Date(data.date),
         amount: amount.toFixed(2),
+        method: data.method,
         bankRef: data.bankRef,
         entryId: entry.id,
       },
