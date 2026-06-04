@@ -14,6 +14,7 @@ const sections: Section[] = [
     items: [
       { href: "/reports/trial-balance", title: "Trial Balance", description: "Debits and credits across all accounts for a period." },
       { href: "/reports/general-ledger", title: "General Ledger", description: "Posted transactions and running balance for an account." },
+      { href: "/reports/cash-book", title: "Cash Book", description: "Bank and cash movements with running balance, per account." },
     ],
   },
   {

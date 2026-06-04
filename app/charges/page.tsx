@@ -75,6 +75,7 @@ export default async function ChargesPage({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Invoice #</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead>Description</TableHead>
@@ -87,6 +88,13 @@ export default async function ChargesPage({
           <TableBody>
             {charges.map((c) => (
               <TableRow key={c.id}>
+                <TableCell className="font-mono">
+                  {c.invoiceNo ? (
+                    <Link className="hover:underline" href={`/charges/${c.id}`}>{c.invoiceNo}</Link>
+                  ) : (
+                    <Link className="text-muted-foreground hover:underline" href={`/charges/${c.id}`}>—</Link>
+                  )}
+                </TableCell>
                 <TableCell>{format(c.date, "dd MMM yyyy")}</TableCell>
                 <TableCell><Link className="font-medium hover:underline" href={`/residents/${c.residentId}`}>{c.resident.unitAddress}</Link></TableCell>
                 <TableCell className="text-muted-foreground">{c.description}</TableCell>

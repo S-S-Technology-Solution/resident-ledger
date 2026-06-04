@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { controlAccount } from "@/lib/control-accounts";
 import { nextEntryNo } from "@/lib/journal";
+import { nextInvoiceNo } from "@/lib/invoices";
 
 const schema = z.object({
   residentId: z.string().min(1),
@@ -27,6 +28,7 @@ async function createChargeWithJE(input: ChargeInput) {
   const ar = await controlAccount("AR");
   const income = await controlAccount("INCOME_FEE");
   const entryNo = await nextEntryNo();
+  const invoiceNo = await nextInvoiceNo(DEFAULT_ASSOCIATION_ID, new Date(data.date));
 
   return db.$transaction(async (tx) => {
     const entry = await tx.journalEntry.create({
@@ -50,6 +52,7 @@ async function createChargeWithJE(input: ChargeInput) {
       data: {
         associationId: DEFAULT_ASSOCIATION_ID,
         residentId: data.residentId,
+        invoiceNo,
         periodMonth: data.periodMonth,
         periodYear: data.periodYear,
         amount: amount.toFixed(2),

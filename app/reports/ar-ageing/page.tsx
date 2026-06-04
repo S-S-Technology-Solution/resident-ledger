@@ -33,7 +33,6 @@ export default async function ARAgeingPage({
 
   const residents = await db.resident.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID },
-    orderBy: { unitAddress: "asc" },
     include: {
       charges: {
         where: { voided: false, date: { lte: asOf } },
@@ -72,7 +71,16 @@ export default async function ARAgeingPage({
     }
     const total = buckets.current.plus(buckets.d1_30).plus(buckets.d31_60).plus(buckets.d61_90).plus(buckets.d90p);
     return { unit: r.unitAddress, owner: r.ownerName, ...buckets, total };
-  }).filter((r) => !r.total.eq(0));
+  }).filter((r) => !r.total.eq(0)).sort((a, b) => {
+    const key = (addr: string): [number, number, string] => {
+      const jm = addr.match(/Jln\s+\d+\/(\d+)/i) ?? addr.match(/Jalan\s+\d+\/(\d+)/i);
+      const um = addr.match(/No\.?\s*(\d+)/i);
+      return [jm ? parseInt(jm[1], 10) : 9999, um ? parseInt(um[1], 10) : 9999, addr];
+    };
+    const [aj, au, as] = key(a.unit);
+    const [bj, bu, bs] = key(b.unit);
+    return aj - bj || au - bu || as.localeCompare(bs);
+  });
 
   const totals = rows.reduce(
     (s, r) => ({

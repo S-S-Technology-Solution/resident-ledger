@@ -150,6 +150,7 @@ model Charge {
   association   Association @relation(fields: [associationId], references: [id])
   residentId    String
   resident      Resident    @relation(fields: [residentId], references: [id])
+  invoiceNo     String?
   periodMonth   Int
   periodYear    Int
   amount        Decimal     @db.Decimal(15, 2)
@@ -161,6 +162,7 @@ model Charge {
 
   allocations PaymentAllocation[]
 
+  @@unique([associationId, invoiceNo])
   @@index([residentId])
 }
 

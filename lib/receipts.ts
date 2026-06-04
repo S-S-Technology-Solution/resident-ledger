@@ -2,15 +2,17 @@ import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 
 export async function nextReceiptNo(associationId = DEFAULT_ASSOCIATION_ID): Promise<string> {
-  const year = new Date().getFullYear();
-  const prefix = `OR-${year}-`;
+  const now = new Date();
+  const yy = String(now.getFullYear() % 100).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const prefix = `OR-${yy}${mm}`;
   const last = await db.receipt.findFirst({
     where: { associationId, receiptNo: { startsWith: prefix } },
     orderBy: { receiptNo: "desc" },
     select: { receiptNo: true },
   });
   const n = last ? parseInt(last.receiptNo.slice(prefix.length), 10) + 1 : 1;
-  return `${prefix}${String(n).padStart(5, "0")}`;
+  return `${prefix}${String(n).padStart(2, "0")}`;
 }
 
 export function amountInWords(amount: number): string {

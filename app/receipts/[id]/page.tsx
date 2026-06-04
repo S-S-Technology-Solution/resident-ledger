@@ -28,7 +28,7 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
           html, body { font-size: 11px; }
           .print-receipt { max-width: none !important; border-radius: 0 !important; }
           .print-receipt > header { padding: 12px 16px !important; }
-          .print-receipt > header .h-14 { height: 2.25rem !important; width: 2.25rem !important; font-size: 1rem !important; }
+          .print-receipt > header .h-14 { height: 2.25rem !important; width: 2.25rem !important; font-size: 0.625rem !important; letter-spacing: -0.02em; }
           .print-receipt section, .print-receipt > div { padding: 10px 16px !important; }
           .print-receipt table { font-size: 10px !important; }
           .print-receipt h1, .print-receipt h2 { font-size: 1rem !important; }
@@ -51,11 +51,10 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
         {/* Letterhead */}
         <header className="relative bg-gradient-to-r from-emerald-700 to-emerald-800 px-8 py-6 text-emerald-50 print:bg-white print:bg-none print:text-emerald-800">
           <div className="flex items-start gap-4">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-white/15 text-2xl font-black ring-1 ring-white/30 print:bg-emerald-100 print:text-emerald-800 print:ring-emerald-300">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-white/15 text-sm font-black tracking-tight ring-1 ring-white/30 print:bg-emerald-100 print:text-emerald-800 print:ring-emerald-300">
               {association.name
-                .split(" ")
+                .split(/\s+/)
                 .filter((w) => /^[A-Z]/.test(w))
-                .slice(0, 2)
                 .map((w) => w[0])
                 .join("") || "R"}
             </div>
@@ -134,14 +133,12 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
           )}
         </div>
 
-        {/* Signatures */}
-        <footer className="grid grid-cols-2 gap-12 px-8 pt-16 pb-8 text-xs text-muted-foreground">
-          <div>
-            <div className="border-t border-foreground/40 pt-1.5">Resident&apos;s Signature</div>
-          </div>
+        {/* Treasurer block — no manual signature required */}
+        <footer className="flex justify-end px-8 pt-12 pb-8 text-xs text-muted-foreground">
           <div className="text-right">
-            <div className="border-t border-foreground/40 pt-1.5">Treasurer</div>
-            <div className="mt-1 text-[10px]">{association.name}</div>
+            <div className="italic text-foreground/70">Computer Generated</div>
+            <div className="mt-1 font-medium text-foreground/80">Treasurer</div>
+            <div className="mt-0.5 text-[10px]">{association.name}</div>
           </div>
         </footer>
 
