@@ -3,10 +3,10 @@ import { DEFAULT_ASSOCIATION_ID } from "./association";
 
 const CODES = {
   AR: "3000/0000",
-  INCOME_FEE: "5001/0000",
+  INCOME_FEE: "5000/0001",
   BANK: "3300/0000",
   CASH: "3300/0010",
-  AP: "4010/0000",
+  AP: "4000/0000",
 } as const;
 
 export type ControlAccountKey = keyof typeof CODES;

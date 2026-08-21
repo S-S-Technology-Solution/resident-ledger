@@ -56,7 +56,7 @@ export default async function ReconciliationPage({
   const bookBalanceCleared = clearedIn - clearedOut;
   const bookBalanceTotal = bookBalanceCleared + unclearedIn - unclearedOut;
 
-  const accountLabel = method === "BANK" ? "Hong Leong Bank (3300/0000)" : "Cash on hand (3300/0010)";
+  const accountLabel = method === "BANK" ? "RHB Bank (3300/0000)" : "Cash (3300/0010)";
 
   return (
     <div className="space-y-6">

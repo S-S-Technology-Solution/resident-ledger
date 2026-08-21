@@ -110,7 +110,7 @@ export default async function CashBookPage({
   const totalOut = rows.reduce((s, r) => s.plus(r.credit), new Decimal(0));
   const closing = running;
 
-  const accountLabel = accountKey === "BANK" ? "Bank (3300/0000)" : "Cash on hand (3300/0010)";
+  const accountLabel = accountKey === "BANK" ? "Bank (3300/0000)" : "Cash (3300/0010)";
 
   return (
     <div className="space-y-6">

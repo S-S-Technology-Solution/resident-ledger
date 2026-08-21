@@ -41,3 +41,34 @@ export async function toggleAccount(id: string, active: boolean) {
   await db.account.update({ where: { id }, data: { active } });
   revalidatePath("/accounts");
 }
+
+// Control account codes required by the system — never deletable.
+const RESERVED_CODES = new Set(["3000/0000", "5000/0001", "3300/0000", "3300/0010", "4000/0000"]);
+
+export async function deleteAccount(id: string) {
+  const account = await db.account.findUnique({ where: { id } });
+  if (!account) throw new Error("Account not found");
+
+  if (RESERVED_CODES.has(account.code)) {
+    throw new Error(`${account.code} is a system control account and cannot be deleted.`);
+  }
+
+  const [lineCount, childCount, billCount] = await Promise.all([
+    db.journalLine.count({ where: { accountId: id } }),
+    db.account.count({ where: { parentId: id } }),
+    db.bill.count({ where: { expenseAccountId: id } }),
+  ]);
+
+  if (lineCount > 0) {
+    throw new Error(`Cannot delete — account has ${lineCount} journal line${lineCount === 1 ? "" : "s"}. Deactivate it instead to hide it from pickers.`);
+  }
+  if (childCount > 0) {
+    throw new Error(`Cannot delete — ${childCount} other account${childCount === 1 ? " is" : "s are"} grouped under this one. Reassign them first.`);
+  }
+  if (billCount > 0) {
+    throw new Error(`Cannot delete — ${billCount} bill${billCount === 1 ? "" : "s"} reference this account as the expense category.`);
+  }
+
+  await db.account.delete({ where: { id } });
+  revalidatePath("/accounts");
+}

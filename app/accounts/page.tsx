@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BookOpen } from "lucide-react";
 import { AccountDialog } from "./account-dialog";
 import { ToggleButton } from "./toggle-button";
+import { DeleteButton } from "./delete-button";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
@@ -66,7 +67,7 @@ export default async function AccountsPage({
               <TableHead className="w-24">Classified As</TableHead>
               <TableHead className="w-28">Group To A/C</TableHead>
               <TableHead className="w-20">Status</TableHead>
-              <TableHead className="w-36 text-right">Actions</TableHead>
+              <TableHead className="w-48 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -87,6 +88,7 @@ export default async function AccountsPage({
                     group: a.group, classifiedAs: a.classifiedAs,
                   }} />
                   <ToggleButton id={a.id} active={a.active} />
+                  <DeleteButton id={a.id} code={a.code} />
                 </TableCell>
               </TableRow>
             ))}
