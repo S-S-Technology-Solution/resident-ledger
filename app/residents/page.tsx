@@ -21,7 +21,7 @@ export default async function ResidentsPage({
   const { q } = await searchParams;
   const all = await residentBalances();
   const rows = q
-    ? all.filter((r) => r.unitAddress.toLowerCase().includes(q.toLowerCase()) || r.ownerName.toLowerCase().includes(q.toLowerCase()))
+    ? all.filter((r) => r.unitAddress.toLowerCase().includes(q.toLowerCase()) || r.ownerName.toLowerCase().includes(q.toLowerCase()) || r.debtorCode?.toLowerCase().includes(q.toLowerCase()))
     : all;
 
   return (
@@ -40,6 +40,7 @@ export default async function ResidentsPage({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-28">Debtor A/C</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead>Owner</TableHead>
               <TableHead className="text-right">Monthly Fee</TableHead>
@@ -51,6 +52,7 @@ export default async function ResidentsPage({
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id}>
+                <TableCell className="font-mono text-muted-foreground">{r.debtorCode ?? "—"}</TableCell>
                 <TableCell><Link href={`/residents/${r.id}`} className="font-medium hover:underline">{r.unitAddress}</Link></TableCell>
                 <TableCell className="text-muted-foreground">{r.ownerName}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.monthlyFee)}</TableCell>

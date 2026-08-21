@@ -134,6 +134,9 @@ model Resident {
   unitAddress   String
   ownerName     String
   phone         String?
+  // Debtor ledger account, e.g. 3000/A01 — row letter by street + odd/even, then unit no.
+  // All debtor accounts control to G/L 3000/0000 (Residents account).
+  debtorCode    String?
   monthlyFee    Decimal     @default(0) @db.Decimal(15, 2)
   active        Boolean     @default(true)
   createdAt     DateTime    @default(now())
@@ -142,6 +145,7 @@ model Resident {
   receipts Receipt[]
 
   @@unique([associationId, unitAddress])
+  @@unique([associationId, debtorCode])
 }
 
 model Charge {

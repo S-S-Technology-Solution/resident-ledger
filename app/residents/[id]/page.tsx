@@ -43,7 +43,7 @@ export default async function ResidentDetailPage({ params }: { params: Promise<{
     <div className="space-y-6">
       <PageHeader
         title={resident.unitAddress}
-        description={resident.ownerName + (resident.phone ? ` · ${resident.phone}` : "")}
+        description={(resident.debtorCode ? `${resident.debtorCode} · ` : "") + resident.ownerName + (resident.phone ? ` · ${resident.phone}` : "")}
         actions={
           <div className="no-print flex gap-2">
             <Button asChild variant="outline"><Link href={`/residents/${id}/statement`}>Statement</Link></Button>

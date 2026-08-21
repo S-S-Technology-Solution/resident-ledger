@@ -27,6 +27,7 @@ export async function residentBalances() {
       id: r.id,
       unitAddress: r.unitAddress,
       ownerName: r.ownerName,
+      debtorCode: r.debtorCode,
       monthlyFee: new Decimal(r.monthlyFee.toString()),
       active: r.active,
       charges,
