@@ -91,7 +91,7 @@ Reports:
 - [x] Profit & Loss
 - [x] Balance Sheet
 - [x] General Ledger
-- [x] Export to PDF and Excel
+- [x] Export to PDF and Excel — on every report that produces a table
 - [x] Cash Flow Statement — **new**
 - [x] Print Batch of Transaction — **new**
 - [x] Fixed Assets Report — **new**

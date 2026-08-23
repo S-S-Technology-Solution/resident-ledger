@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,7 @@ export default async function InvoiceListingPage({
               ? "Resident invoices settled in full"
               : "Resident invoices with something still outstanding"
         }
+        actions={<ExportButtons slug="invoice-listing" params={{ view }} />}
       />
 
       <div className="flex gap-1 border-b no-print">

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export default async function AccountRangePage({
       <PageHeader
         title="Range of Accounts"
         description={`Chart of accounts with balances as at ${format(asOf, "dd MMM yyyy")}`}
+        actions={<ExportButtons slug="account-range" params={{ fromCode, toCode, to }} />}
       />
 
       <form className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 no-print">

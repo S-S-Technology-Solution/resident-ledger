@@ -12,6 +12,13 @@ import {
   expenseByCategory,
   expenseBySupplier,
   paymentHistory,
+  fixedAssets,
+  invoiceListing,
+  billListing,
+  salesReport,
+  creditorPayments,
+  accountRange,
+  batchTransactions,
 } from "@/lib/export/reports";
 import type { ReportData } from "@/lib/export/types";
 
@@ -38,6 +45,17 @@ async function buildReport(slug: string, sp: URLSearchParams): Promise<ReportDat
       if (!residentId) throw new Error("residentId is required for payment-history");
       return paymentHistory(residentId, range);
     }
+    case "fixed-assets": return fixedAssets(range);
+    case "invoice-listing": return invoiceListing({ ...range, view: sp.get("view") ?? undefined });
+    case "bill-listing": return billListing({ ...range, view: sp.get("view") ?? undefined });
+    case "sales-report": return salesReport(range);
+    case "creditor-payments": return creditorPayments(range);
+    case "account-range": return accountRange({
+      ...range,
+      fromCode: sp.get("fromCode") ?? undefined,
+      toCode: sp.get("toCode") ?? undefined,
+    });
+    case "batch-transactions": return batchTransactions({ batch: sp.get("batch") ?? undefined });
     default: throw new Error(`Unknown report ${slug}`);
   }
 }

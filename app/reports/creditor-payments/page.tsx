@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export default async function CreditorPaymentsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Creditor Payments" description={description} actions={<DateRange />} />
+      <PageHeader title="Creditor Payments" description={description} actions={<><DateRange /><ExportButtons slug="creditor-payments" params={{ from, to }} /></>} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Payments" value={String(payments.length)} />

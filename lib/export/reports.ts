@@ -432,3 +432,350 @@ export async function expenseBySupplier(r: Range): Promise<ReportData> {
     totals: { name: "TOTAL", count: "", total: total.toNumber() },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Reports added alongside the Million parity work. Same shape as the ones above:
+// build a ReportData and the PDF and Excel writers handle the rest.
+// ---------------------------------------------------------------------------
+
+export async function fixedAssets(r: Range): Promise<ReportData> {
+  const asOf = r.to ? new Date(r.to) : new Date();
+  const accounts = await db.account.findMany({
+    where: { associationId: DEFAULT_ASSOCIATION_ID, classifiedAs: { in: ["FA", "FD"] } },
+    include: {
+      lines: { where: { entry: { status: "POSTED", date: { lte: asOf } } }, select: { debit: true, credit: true } },
+    },
+    orderBy: { code: "asc" },
+  });
+  const bal = (a: (typeof accounts)[number]) =>
+    a.lines.reduce((s, l) => s.plus(new Decimal(l.debit.toString())).minus(new Decimal(l.credit.toString())), new Decimal(0));
+
+  const stem = (code: string) => code.split("/")[0];
+  const depn = new Map(accounts.filter((a) => a.classifiedAs === "FD").map((d) => [stem(d.code), d]));
+
+  let tc = new Decimal(0), td = new Decimal(0);
+  const rows = accounts
+    .filter((a) => a.classifiedAs === "FA")
+    .map((a) => {
+      const d = depn.get(stem(a.code));
+      const cost = bal(a);
+      const accum = d ? bal(d).negated() : new Decimal(0);
+      return { a, cost, accum, nbv: cost.minus(accum), depnCode: d?.code ?? "" };
+    })
+    .filter((x) => !x.cost.isZero() || !x.accum.isZero())
+    .map((x) => {
+      tc = tc.plus(x.cost); td = td.plus(x.accum);
+      return {
+        code: x.a.code, name: x.a.name, depnCode: x.depnCode,
+        cost: x.cost.toNumber(), accum: x.accum.toNumber(), nbv: x.nbv.toNumber(),
+      };
+    });
+
+  return {
+    ...(await base()),
+    title: "Fixed Assets",
+    subtitle: `As of ${asOf.toISOString().slice(0, 10)}`,
+    columns: [
+      { key: "code", header: "A/C No.", width: 1.2 },
+      { key: "name", header: "Asset", width: 3.5 },
+      { key: "depnCode", header: "Depn A/C", width: 1.2 },
+      numCol("cost", "Cost", 1.5),
+      numCol("accum", "Accum. Depn", 1.5),
+      numCol("nbv", "Net Book Value", 1.6),
+    ],
+    rows,
+    totals: { code: "TOTAL", name: "", depnCode: "", cost: tc.toNumber(), accum: td.toNumber(), nbv: tc.minus(td).toNumber() },
+  };
+}
+
+export async function invoiceListing(r: Range & { view?: string }): Promise<ReportData> {
+  const view = r.view === "paid" ? "paid" : r.view === "due" ? "due" : "unpaid";
+  const today = new Date();
+  const charges = await db.charge.findMany({
+    where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false },
+    include: {
+      resident: { select: { debtorCode: true, unitAddress: true, ownerName: true } },
+      allocations: { include: { receipt: { select: { voided: true } } } },
+    },
+    orderBy: [{ date: "asc" }],
+  });
+
+  let ta = new Decimal(0), tp = new Decimal(0), to = new Decimal(0);
+  const rows = charges
+    .map((c) => {
+      const amount = new Decimal(c.amount.toString());
+      const paid = c.allocations.filter((a) => !a.receipt.voided)
+        .reduce((s, a) => s.plus(new Decimal(a.amount.toString())), new Decimal(0));
+      const due = new Date(c.date.getTime() + 30 * 86400000);
+      return { c, amount, paid, open: amount.minus(paid), due };
+    })
+    .filter((x) => view === "paid" ? x.open.lte(0)
+      : view === "due" ? x.open.gt(0) && x.due.getTime() - today.getTime() <= 7 * 86400000
+      : x.open.gt(0))
+    .map((x) => {
+      ta = ta.plus(x.amount); tp = tp.plus(x.paid); to = to.plus(x.open);
+      return {
+        date: x.c.date.toISOString().slice(0, 10),
+        invoiceNo: x.c.invoiceNo ?? "",
+        code: x.c.resident.debtorCode ?? "",
+        unit: x.c.resident.unitAddress,
+        owner: x.c.resident.ownerName,
+        due: x.due.toISOString().slice(0, 10),
+        amount: x.amount.toNumber(), paid: x.paid.toNumber(), open: x.open.toNumber(),
+      };
+    });
+
+  return {
+    ...(await base()),
+    title: view === "paid" ? "Paid Invoices" : view === "due" ? "Invoices Payment Due" : "Unpaid Invoices",
+    subtitle: `As of ${today.toISOString().slice(0, 10)}`,
+    columns: [
+      { key: "date", header: "Date", width: 1.2 },
+      { key: "invoiceNo", header: "Invoice #", width: 1.3 },
+      { key: "code", header: "Debtor A/C", width: 1.2 },
+      { key: "unit", header: "Unit", width: 2 },
+      { key: "owner", header: "Owner", width: 2.5 },
+      { key: "due", header: "Due", width: 1.2 },
+      numCol("amount", "Amount", 1.3),
+      numCol("paid", "Paid", 1.3),
+      numCol("open", "Balance", 1.3),
+    ],
+    rows,
+    totals: { date: "TOTAL", invoiceNo: "", code: "", unit: "", owner: "", due: "", amount: ta.toNumber(), paid: tp.toNumber(), open: to.toNumber() },
+  };
+}
+
+export async function billListing(r: Range & { view?: string }): Promise<ReportData> {
+  const view = r.view === "paid" ? "paid" : r.view === "due" ? "due" : "unpaid";
+  const today = new Date();
+  const bills = await db.bill.findMany({
+    where: {
+      associationId: DEFAULT_ASSOCIATION_ID,
+      ...(view === "paid" ? { status: "PAID" as const } : { status: { in: ["UNPAID", "PARTIAL"] as const } }),
+    },
+    include: { supplier: true },
+    orderBy: [{ dueDate: "asc" }, { date: "asc" }],
+  });
+
+  const filtered = view === "due"
+    ? bills.filter((b) => b.dueDate && b.dueDate.getTime() - today.getTime() <= 7 * 86400000)
+    : bills;
+
+  let ta = new Decimal(0), tp = new Decimal(0);
+  const rows = filtered.map((b) => {
+    const amount = new Decimal(b.amount.toString());
+    const paid = new Decimal(b.paid.toString());
+    ta = ta.plus(amount); tp = tp.plus(paid);
+    return {
+      date: b.date.toISOString().slice(0, 10),
+      invoiceNo: b.invoiceNo,
+      supplier: b.supplier.name,
+      due: b.dueDate ? b.dueDate.toISOString().slice(0, 10) : "",
+      status: b.status,
+      amount: amount.toNumber(), paid: paid.toNumber(), open: amount.minus(paid).toNumber(),
+    };
+  });
+
+  return {
+    ...(await base()),
+    title: view === "paid" ? "Paid Bills" : view === "due" ? "Bills Payment Due" : "Unpaid Bills",
+    subtitle: `As of ${today.toISOString().slice(0, 10)}`,
+    columns: [
+      { key: "date", header: "Date", width: 1.2 },
+      { key: "invoiceNo", header: "Invoice #", width: 1.5 },
+      { key: "supplier", header: "Supplier", width: 3 },
+      { key: "due", header: "Due", width: 1.2 },
+      { key: "status", header: "Status", width: 1 },
+      numCol("amount", "Amount", 1.3),
+      numCol("paid", "Paid", 1.3),
+      numCol("open", "Balance", 1.3),
+    ],
+    rows,
+    totals: { date: "TOTAL", invoiceNo: "", supplier: "", due: "", status: "", amount: ta.toNumber(), paid: tp.toNumber(), open: ta.minus(tp).toNumber() },
+  };
+}
+
+export async function salesReport(r: Range): Promise<ReportData> {
+  const range = parseRange(r);
+  const charges = await db.charge.findMany({
+    where: {
+      associationId: DEFAULT_ASSOCIATION_ID, voided: false, isOpeningBalance: false,
+      ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
+    },
+    include: {
+      resident: { select: { id: true, debtorCode: true, unitAddress: true, ownerName: true } },
+      allocations: { include: { receipt: { select: { voided: true } } } },
+    },
+  });
+
+  const acc = new Map<string, { code: string; unit: string; owner: string; count: number; billed: Decimal; settled: Decimal }>();
+  for (const c of charges) {
+    const e = acc.get(c.resident.id) ?? {
+      code: c.resident.debtorCode ?? "", unit: c.resident.unitAddress, owner: c.resident.ownerName,
+      count: 0, billed: new Decimal(0), settled: new Decimal(0),
+    };
+    e.count++;
+    e.billed = e.billed.plus(new Decimal(c.amount.toString()));
+    e.settled = e.settled.plus(c.allocations.filter((a) => !a.receipt.voided)
+      .reduce((s, a) => s.plus(new Decimal(a.amount.toString())), new Decimal(0)));
+    acc.set(c.resident.id, e);
+  }
+
+  let tb = new Decimal(0), ts = new Decimal(0);
+  const rows = [...acc.values()].sort((a, b) => b.billed.comparedTo(a.billed)).map((e) => {
+    tb = tb.plus(e.billed); ts = ts.plus(e.settled);
+    return {
+      code: e.code, unit: e.unit, owner: e.owner, count: e.count,
+      billed: e.billed.toNumber(), settled: e.settled.toNumber(),
+      open: e.billed.minus(e.settled).toNumber(),
+    };
+  });
+
+  return {
+    ...(await base()),
+    title: "Debtors Sales Report",
+    subtitle: rangeSubtitle(r),
+    columns: [
+      { key: "code", header: "Debtor A/C", width: 1.2 },
+      { key: "unit", header: "Unit", width: 2 },
+      { key: "owner", header: "Owner", width: 2.5 },
+      { key: "count", header: "Invoices", align: "right", width: 1 },
+      numCol("billed", "Billed", 1.4),
+      numCol("settled", "Settled", 1.4),
+      numCol("open", "Outstanding", 1.4),
+    ],
+    rows,
+    totals: { code: "TOTAL", unit: "", owner: "", count: "", billed: tb.toNumber(), settled: ts.toNumber(), open: tb.minus(ts).toNumber() },
+  };
+}
+
+export async function creditorPayments(r: Range): Promise<ReportData> {
+  const range = parseRange(r);
+  const payments = await db.billPayment.findMany({
+    where: {
+      bill: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "VOIDED" } },
+      ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
+    },
+    include: { bill: { include: { supplier: true } } },
+    orderBy: [{ date: "desc" }],
+  });
+
+  let total = new Decimal(0);
+  const rows = payments.map((p) => {
+    total = total.plus(new Decimal(p.amount.toString()));
+    return {
+      date: p.date.toISOString().slice(0, 10),
+      supplier: p.bill.supplier.name,
+      code: p.bill.supplier.creditorCode ?? "",
+      invoiceNo: p.bill.invoiceNo,
+      method: p.method,
+      ref: p.bankRef ?? "",
+      amount: Number(p.amount),
+    };
+  });
+
+  return {
+    ...(await base()),
+    title: "Creditor Payments",
+    subtitle: rangeSubtitle(r),
+    columns: [
+      { key: "date", header: "Date", width: 1.2 },
+      { key: "supplier", header: "Supplier", width: 3 },
+      { key: "code", header: "Creditor A/C", width: 1.2 },
+      { key: "invoiceNo", header: "Invoice", width: 1.5 },
+      { key: "method", header: "Method", width: 1 },
+      { key: "ref", header: "Reference", width: 1.5 },
+      numCol("amount", "Amount", 1.4),
+    ],
+    rows,
+    totals: { date: "TOTAL", supplier: "", code: "", invoiceNo: "", method: "", ref: "", amount: total.toNumber() },
+  };
+}
+
+export async function accountRange(r: Range & { fromCode?: string; toCode?: string }): Promise<ReportData> {
+  const asOf = r.to ? new Date(r.to) : new Date();
+  const accounts = await db.account.findMany({
+    where: { associationId: DEFAULT_ASSOCIATION_ID },
+    include: { lines: { where: { entry: { status: "POSTED", date: { lte: asOf } } }, select: { debit: true, credit: true } } },
+    orderBy: { code: "asc" },
+  });
+
+  const rows = accounts
+    .filter((a) => (!r.fromCode || a.code >= r.fromCode) && (!r.toCode || a.code <= r.toCode))
+    .map((a) => {
+      const dr = a.lines.reduce((s, l) => s.plus(new Decimal(l.debit.toString())), new Decimal(0));
+      const cr = a.lines.reduce((s, l) => s.plus(new Decimal(l.credit.toString())), new Decimal(0));
+      const raw = dr.minus(cr);
+      return { a, balance: a.normalSide === "DEBIT" ? raw : raw.negated() };
+    })
+    .filter((x) => !x.balance.isZero())
+    .map((x) => ({
+      code: x.a.code, name: x.a.name, group: x.a.group, type: x.a.type,
+      side: x.a.normalSide === "DEBIT" ? "Dr" : "Cr",
+      balance: x.balance.toNumber(),
+    }));
+
+  return {
+    ...(await base()),
+    title: "Range of Accounts",
+    subtitle: `As of ${asOf.toISOString().slice(0, 10)}`,
+    columns: [
+      { key: "code", header: "A/C No.", width: 1.2 },
+      { key: "name", header: "Description", width: 3.5 },
+      { key: "group", header: "Group", width: 2 },
+      { key: "type", header: "Type", width: 1.2 },
+      { key: "side", header: "Side", width: 0.8 },
+      numCol("balance", "Balance", 1.5),
+    ],
+    rows,
+  };
+}
+
+export async function batchTransactions(r: { batch?: string }): Promise<ReportData> {
+  if (!r.batch) throw new Error("batch is required for batch-transactions");
+  const batch = await db.batch.findUnique({
+    where: { associationId_batchNo: { associationId: DEFAULT_ASSOCIATION_ID, batchNo: r.batch } },
+    include: {
+      entries: {
+        where: { status: "POSTED" },
+        orderBy: [{ date: "asc" }, { entryNo: "asc" }],
+        include: { lines: { include: { account: true }, orderBy: { lineNo: "asc" } } },
+      },
+    },
+  });
+  if (!batch) throw new Error(`Batch ${r.batch} not found`);
+
+  let td = new Decimal(0), tc = new Decimal(0);
+  const rows: Record<string, string | number | null>[] = [];
+  for (const e of batch.entries) {
+    for (const [i, l] of e.lines.entries()) {
+      const d = new Decimal(l.debit.toString());
+      const c = new Decimal(l.credit.toString());
+      td = td.plus(d); tc = tc.plus(c);
+      rows.push({
+        date: i === 0 ? e.date.toISOString().slice(0, 10) : "",
+        entryNo: i === 0 ? e.entryNo : "",
+        code: l.account.code,
+        description: i === 0 ? e.description : l.account.name,
+        debit: d.isZero() ? "" : d.toNumber(),
+        credit: c.isZero() ? "" : c.toNumber(),
+      });
+    }
+  }
+
+  return {
+    ...(await base()),
+    title: `Batch ${batch.batchNo}`,
+    subtitle: batch.description,
+    columns: [
+      { key: "date", header: "Date", width: 1.2 },
+      { key: "entryNo", header: "Entry #", width: 1.5 },
+      { key: "code", header: "A/C No.", width: 1.2 },
+      { key: "description", header: "Description", width: 4 },
+      numCol("debit", "Debit", 1.4),
+      numCol("credit", "Credit", 1.4),
+    ],
+    rows,
+    totals: { date: "TOTAL", entryNo: "", code: "", description: "", debit: td.toNumber(), credit: tc.toNumber() },
+  };
+}

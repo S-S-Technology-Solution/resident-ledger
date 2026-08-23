@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,7 @@ export default async function FixedAssetsPage({
       <PageHeader
         title="Fixed Assets"
         description={`Cost less accumulated depreciation as at ${format(asOf, "dd MMM yyyy")}`}
-        actions={<DateRange />}
+        actions={<><DateRange /><ExportButtons slug="fixed-assets" params={{ to }} /></>}
       />
 
       <DataCard>

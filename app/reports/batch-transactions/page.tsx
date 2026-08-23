@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,8 @@ export default async function BatchTransactionsPage({
         description={batch ? `${batch.batchNo} — ${batch.description}` : "Select a batch to print"}
         actions={
           batch && (
-            <div className="flex gap-1 no-print">
+            <div className="flex items-center gap-2 no-print">
+              <ExportButtons slug="batch-transactions" params={{ batch: batch.batchNo }} />
               <Link
                 href={`/reports/batch-transactions?batch=${batch.batchNo}`}
                 className={detail ? "rounded-md border border-primary bg-primary px-3 py-1.5 text-xs text-primary-foreground" : "rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"}

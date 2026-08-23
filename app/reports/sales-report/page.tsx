@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,7 @@ export default async function SalesReportPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Debtors Sales Report" description={description} actions={<DateRange />} />
+      <PageHeader title="Debtors Sales Report" description={description} actions={<><DateRange /><ExportButtons slug="sales-report" params={{ from, to }} /></>} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Invoices raised" value={String(charges.length)} />
