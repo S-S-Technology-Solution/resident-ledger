@@ -27,7 +27,7 @@ export default async function ReconciliationPage({
     ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } }
     : {};
 
-  const [receipts, payments] = await Promise.all([
+  const [receipts, payments, cashEntries] = await Promise.all([
     db.receipt.findMany({
       where: {
         associationId: DEFAULT_ASSOCIATION_ID,
@@ -47,12 +47,30 @@ export default async function ReconciliationPage({
       include: { bill: { include: { supplier: true } } },
       orderBy: { date: "asc" },
     }),
+    db.cashEntry.findMany({
+      where: {
+        associationId: DEFAULT_ASSOCIATION_ID,
+        method,
+        voided: false,
+        ...dateFilter,
+      },
+      include: { account: { select: { code: true, name: true } } },
+      orderBy: [{ date: "asc" }, { refNo: "asc" }],
+    }),
   ]);
 
-  const clearedIn = receipts.filter((r) => r.cleared).reduce((s, r) => s + Number(r.amount), 0);
-  const clearedOut = payments.filter((p) => p.cleared).reduce((s, p) => s + Number(p.amount), 0);
-  const unclearedIn = receipts.filter((r) => !r.cleared).reduce((s, r) => s + Number(r.amount), 0);
-  const unclearedOut = payments.filter((p) => !p.cleared).reduce((s, p) => s + Number(p.amount), 0);
+  // Cash book entries hit the same bank account, so they belong in the same
+  // reconciliation as resident receipts and supplier payments.
+  const cashIn = cashEntries.filter((c) => c.direction === "IN");
+  const cashOut = cashEntries.filter((c) => c.direction === "OUT");
+
+  const sumIf = <T extends { cleared: boolean; amount: unknown }>(rows: T[], cleared: boolean) =>
+    rows.filter((r) => r.cleared === cleared).reduce((s, r) => s + Number(r.amount), 0);
+
+  const clearedIn = sumIf(receipts, true) + sumIf(cashIn, true);
+  const clearedOut = sumIf(payments, true) + sumIf(cashOut, true);
+  const unclearedIn = sumIf(receipts, false) + sumIf(cashIn, false);
+  const unclearedOut = sumIf(payments, false) + sumIf(cashOut, false);
   const bookBalanceCleared = clearedIn - clearedOut;
   const bookBalanceTotal = bookBalanceCleared + unclearedIn - unclearedOut;
 
@@ -99,7 +117,8 @@ export default async function ReconciliationPage({
       <DataCard>
         <div className="px-4 py-3 border-b text-sm font-medium flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-          Deposits in — {receipts.length} {receipts.length === 1 ? "receipt" : "receipts"}
+          Deposits in — {receipts.length + cashIn.length}{" "}
+          {receipts.length + cashIn.length === 1 ? "receipt" : "receipts"}
         </div>
         <Table>
           <TableHeader>
@@ -129,9 +148,24 @@ export default async function ReconciliationPage({
                 amountTone="positive"
               />
             ))}
+            {cashIn.map((c) => (
+              <ReconcileRow
+                key={c.id}
+                kind="cash"
+                id={c.id}
+                cleared={c.cleared}
+                date={format(c.date, "dd MMM yyyy")}
+                code={<Link className="underline" href={`/cash-book/${c.id}`}>{c.refNo}</Link>}
+                label={`${c.counterparty ? c.counterparty + " — " : ""}${c.description}`}
+                bankRef={c.bankRef ?? ""}
+                statementRef={c.statementRef ?? ""}
+                amount={Number(c.amount)}
+                amountTone="positive"
+              />
+            ))}
           </TableBody>
         </Table>
-        {receipts.length === 0 && (
+        {receipts.length + cashIn.length === 0 && (
           <Empty icon={Landmark} title="No deposits" description="No receipts for this account in the selected range." />
         )}
       </DataCard>
@@ -139,7 +173,8 @@ export default async function ReconciliationPage({
       <DataCard>
         <div className="px-4 py-3 border-b text-sm font-medium flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-rose-500" />
-          Withdrawals out — {payments.length} {payments.length === 1 ? "payment" : "payments"}
+          Withdrawals out — {payments.length + cashOut.length}{" "}
+          {payments.length + cashOut.length === 1 ? "payment" : "payments"}
         </div>
         <Table>
           <TableHeader>
@@ -169,9 +204,24 @@ export default async function ReconciliationPage({
                 amountTone="negative"
               />
             ))}
+            {cashOut.map((c) => (
+              <ReconcileRow
+                key={c.id}
+                kind="cash"
+                id={c.id}
+                cleared={c.cleared}
+                date={format(c.date, "dd MMM yyyy")}
+                code={<Link className="underline" href={`/cash-book/${c.id}`}>{c.refNo}</Link>}
+                label={`${c.counterparty ? c.counterparty + " — " : ""}${c.description}`}
+                bankRef={c.bankRef ?? ""}
+                statementRef={c.statementRef ?? ""}
+                amount={Number(c.amount)}
+                amountTone="negative"
+              />
+            ))}
           </TableBody>
         </Table>
-        {payments.length === 0 && (
+        {payments.length + cashOut.length === 0 && (
           <Empty icon={Landmark} title="No withdrawals" description="No bill payments for this account in the selected range." />
         )}
       </DataCard>

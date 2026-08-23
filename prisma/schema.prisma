@@ -32,6 +32,22 @@ enum BillStatus {
   VOIDED
 }
 
+// Transaction batches, mirroring the accountant's existing workflow: every entry
+// belongs to a monthly batch per group. Batch no. is YYMM + group code,
+// e.g. 260110 = Sales, Jan 2026.
+enum BatchGroup {
+  SALES
+  PURCHASE
+  BANK
+  JOURNAL
+  WAGES
+}
+
+enum CashDirection {
+  IN
+  OUT
+}
+
 model Association {
   id              String    @id @default(cuid())
   name            String
@@ -40,6 +56,8 @@ model Association {
   currency        String    @default("RM")
   fiscalYearStart Int       @default(1)
   lockedThrough   DateTime?
+  // Cut-over date: the day the previous system's closing balances were struck.
+  openingDate     DateTime?
   createdAt       DateTime  @default(now())
 
   accounts  Account[]
@@ -49,7 +67,43 @@ model Association {
   charges   Charge[]
   receipts  Receipt[]
   bills     Bill[]
-  users     User[]
+  users       User[]
+  batches     Batch[]
+  years       FiscalYear[]
+  cashEntries CashEntry[]
+}
+
+model Batch {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  batchNo       String
+  group         BatchGroup
+  year          Int
+  month         Int
+  description   String
+  locked        Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+
+  entries JournalEntry[]
+
+  @@unique([associationId, batchNo])
+  @@unique([associationId, group, year, month])
+  @@index([associationId, year, month])
+}
+
+model FiscalYear {
+  id             String      @id @default(cuid())
+  associationId  String
+  association    Association @relation(fields: [associationId], references: [id])
+  year           Int
+  closed         Boolean     @default(false)
+  closedAt       DateTime?
+  closedBy       String?
+  closingEntryId String?
+  surplus        Decimal?    @db.Decimal(15, 2)
+
+  @@unique([associationId, year])
 }
 
 model User {
@@ -79,7 +133,8 @@ model Account {
   active        Boolean     @default(true)
   createdAt     DateTime    @default(now())
 
-  lines JournalLine[]
+  lines       JournalLine[]
+  cashEntries CashEntry[]
 
   @@unique([associationId, code])
   @@index([associationId, type])
@@ -96,6 +151,8 @@ model JournalEntry {
   status        JournalStatus @default(DRAFT)
   source        String        @default("manual")
   sourceId      String?
+  batchId       String?
+  batch         Batch?        @relation(fields: [batchId], references: [id])
   reversesId    String?       @unique
   reverses      JournalEntry? @relation("Reversal", fields: [reversesId], references: [id])
   reversedBy    JournalEntry? @relation("Reversal")
@@ -110,6 +167,7 @@ model JournalEntry {
   @@unique([associationId, entryNo])
   @@index([associationId, date])
   @@index([associationId, status])
+  @@index([batchId])
 }
 
 model JournalLine {
@@ -162,6 +220,10 @@ model Charge {
   date          DateTime
   voided        Boolean     @default(false)
   entryId       String?
+  // Balance brought forward from the previous system. Carries no journal entry of
+  // its own — the GL side comes from the single opening-balance entry, so posting
+  // these individually would double-count prior-year income.
+  isOpeningBalance Boolean  @default(false)
   createdAt     DateTime    @default(now())
 
   allocations PaymentAllocation[]
@@ -187,6 +249,8 @@ model Receipt {
   statementRef  String?
   voided        Boolean     @default(false)
   voidReason    String?
+  // Credit balance brought forward (resident was in advance at cut-over).
+  isOpeningBalance Boolean  @default(false)
   createdAt     DateTime    @default(now())
 
   allocations PaymentAllocation[]
@@ -209,6 +273,8 @@ model Supplier {
   associationId String
   association   Association @relation(fields: [associationId], references: [id])
   name          String
+  // Creditor ledger account, e.g. 4000/001. Controls to G/L 4000/0000 (Payables).
+  creditorCode  String?
   contact       String?
   phone         String?
   bankAccount   String?
@@ -216,6 +282,8 @@ model Supplier {
   createdAt     DateTime    @default(now())
 
   bills Bill[]
+
+  @@unique([associationId, creditorCode])
 }
 
 model Bill {
@@ -232,6 +300,8 @@ model Bill {
   expenseAccountId String
   status           BillStatus  @default(UNPAID)
   entryId          String?
+  // Creditor balance brought forward — see Charge.isOpeningBalance.
+  isOpeningBalance Boolean     @default(false)
   createdAt        DateTime    @default(now())
 
   payments BillPayment[]
@@ -251,6 +321,36 @@ model BillPayment {
   cleared      Boolean   @default(false)
   clearedAt    DateTime?
   statementRef String?
+}
+
+// Cash book: money in or out that is not tied to a resident or supplier —
+// bank interest, one-off contributions, sundry payments. Posts straight to a GL
+// account, with no debtor/creditor allocation.
+model CashEntry {
+  id            String        @id @default(cuid())
+  associationId String
+  association   Association   @relation(fields: [associationId], references: [id])
+  refNo         String
+  direction     CashDirection
+  date          DateTime
+  amount        Decimal       @db.Decimal(15, 2)
+  description   String
+  counterparty  String?
+  method        String        @default("BANK")
+  bankRef       String?
+  chequeNo      String?
+  accountId     String
+  account       Account       @relation(fields: [accountId], references: [id])
+  entryId       String?
+  cleared       Boolean       @default(false)
+  clearedAt     DateTime?
+  statementRef  String?
+  voided        Boolean       @default(false)
+  voidReason    String?
+  createdAt     DateTime      @default(now())
+
+  @@unique([associationId, refNo])
+  @@index([associationId, date])
 }
 
 model AuditLog {

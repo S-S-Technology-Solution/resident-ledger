@@ -16,6 +16,7 @@ export async function supplierBalances() {
     return {
       id: s.id,
       name: s.name,
+      creditorCode: s.creditorCode,
       contact: s.contact,
       phone: s.phone,
       active: s.active,

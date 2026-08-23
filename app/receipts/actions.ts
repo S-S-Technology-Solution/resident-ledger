@@ -6,7 +6,7 @@ import Decimal from "decimal.js";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { controlAccount, paymentMethodAccount } from "@/lib/control-accounts";
-import { nextEntryNo } from "@/lib/journal";
+import { prepareEntry } from "@/lib/journal";
 import { nextReceiptNo } from "@/lib/receipts";
 import { residentOutstanding } from "@/lib/ar";
 
@@ -45,7 +45,7 @@ export async function createReceipt(input: ReceiptInput) {
 
   const ar = await controlAccount("AR");
   const cashOrBank = await paymentMethodAccount(data.method);
-  const entryNo = await nextEntryNo();
+  const { entryNo, batchId } = await prepareEntry(new Date(data.date), "receipt");
   const receiptNo = await nextReceiptNo();
 
   const receipt = await db.$transaction(async (tx) => {
@@ -53,6 +53,7 @@ export async function createReceipt(input: ReceiptInput) {
       data: {
         associationId: DEFAULT_ASSOCIATION_ID,
         entryNo,
+        batchId,
         date: new Date(data.date),
         description: `Receipt ${receiptNo}`,
         reference: receiptNo,
@@ -98,11 +99,12 @@ export async function voidReceipt(id: string, reason: string) {
     if (receipt.entryId) {
       const entry = await tx.journalEntry.findUnique({ where: { id: receipt.entryId }, include: { lines: true } });
       if (entry && entry.status === "POSTED") {
-        const reversalNo = await nextEntryNo();
+        const rev = await prepareEntry(new Date(), "reversal");
         await tx.journalEntry.create({
           data: {
             associationId: entry.associationId,
-            entryNo: reversalNo,
+            entryNo: rev.entryNo,
+            batchId: rev.batchId,
             date: new Date(),
             description: `Reversal of ${entry.entryNo}: ${reason}`,
             status: "POSTED",

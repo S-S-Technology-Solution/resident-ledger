@@ -1,0 +1,165 @@
+# Function checklist — Million accounting system vs ResidentLedger
+
+Every function seen in the `newdocs/` walkthrough, checked against ResidentLedger.
+
+- `[x]` = we have it
+- `[ ]` = we do not have it
+- `~` = partly there, noted alongside
+- `N/A` = not applicable to a residents association (trading, manufacturing,
+  projects, agents, tax)
+
+Items marked **new** were built in this pass.
+
+---
+
+## General
+
+- [x] GL Accounts — create/maintain chart of accounts
+- [x] A/C Opening Balance — balances brought forward from the previous system — **new**
+- [x] Maintain Batch / Generate Batch — monthly batches per group — **new**
+- [x] GL Transaction — double-entry posting
+- [x] Print Transaction — journal listing and detail
+- N/A Maintain Stock Value — trading only
+
+## Account numbering
+
+- [x] Two-part debtor account (control / sub, e.g. 3000/A01)
+- [x] Two-part creditor account (e.g. 4000/001) — **new**
+- [x] Account groups
+- ~ Default control accounts — set in code, no screen to change them
+
+## Cash Book
+
+- [x] Receipt not tied to a debtor — **new**
+- [x] Payment not tied to a creditor — **new**
+- [x] Bank Reconciliation — now includes cash book entries — **new**
+- [x] Print Receipt
+- [x] Print Payment Voucher — **new**
+- [ ] Print Cheque
+
+## Debtors
+
+Entry:
+
+- [x] Debtor maintenance — create/edit resident account
+- [x] Debtor B/F transaction — opening balance per resident — **new**
+- [x] Sales invoice
+- [x] Receive Payment with invoice knock-off
+- [ ] Cheque return
+
+Reports:
+
+- [x] Debtors Statement
+- [x] Debtors Aging
+- [ ] Debtors Payment Due
+- [x] List Debtors Payment
+- [ ] List Paid Bills (debtor side)
+- [ ] List Unpaid Bills (debtor side)
+- [x] Print Official Receipt (A/R)
+- [x] Debtors Collection Report
+- ~ Debtors Outstanding Balance Report — the ageing report covers most of this
+- [x] Print Debtors Ledger — **new**
+- [ ] Debtors Sales Report
+- N/A Top Customer / Agent Sales / Agent Commission
+
+## Creditors
+
+Entry:
+
+- [x] Creditor maintenance — create/edit supplier
+- [x] Creditor B/F transaction — opening balance per supplier — **new**
+- [x] Purchase invoice
+- [x] Payment to creditor
+
+Reports:
+
+- [x] Remittance Advice — **new**
+- [x] Creditors Aging
+- [x] Creditors Payment Due — **new**
+- [ ] List Creditors Payment
+- [x] List Paid Bills — **new**
+- [x] List Unpaid Bills — **new**
+- [x] Print Payment Voucher (A/P) — **new**
+- ~ Creditors Outstanding Balance Report — the ageing report covers most of this
+- [x] Print Creditors Ledger — **new**
+- ~ Creditors Purchase Report — expense-by-supplier is close
+- ~ Top Supplier Report — expense-by-supplier is close
+
+## Reports
+
+- [x] Trial Balance
+- [x] Profit & Loss
+- [x] Balance Sheet
+- [x] General Ledger
+- [x] Export to PDF and Excel
+- [x] Cash Flow Statement — **new**
+- [x] Print Batch of Transaction — **new**
+- [ ] Fixed Assets Report
+- [ ] Gain/Loss Report
+- [ ] Print Range of Accounts
+- [ ] Transaction Voucher Listing
+- [x] Audit Transaction — **new**
+- N/A Manufacturing, Project Ledger, Project Profit, Consolidated Account, Tourism Tax
+
+## Enquiry
+
+- [x] Batch of Transaction — **new**
+- [x] 12-Month Transaction Summary — **new**
+- [ ] 12-Month Payment Due
+- [ ] Check Transaction
+- N/A Check Tax Entry
+
+## Administration / System
+
+- [x] Association details for report headers
+- [x] Admin login and password change
+- [ ] User Account management — one role only, no user admin screen
+- [ ] User Group / permissions
+- [x] Year End Closing — **new**
+- [x] Period lock — now enforced on every posting path — **new**
+- [x] View Audit Trail — **new**
+- ~ Reference numbering — invoice, receipt, voucher and entry numbers exist, not configurable
+- ~ Import / Export Data — export yes, import via scripts only
+- N/A Backup Database — Neon has point-in-time recovery
+- N/A Report Setting, Fonts, Language, Change Key Code, Testing
+
+---
+
+## How the new pieces fit together
+
+**Opening balances** (`/opening-balances`) has three tabs. The general ledger tab
+writes a single balancing journal dated at cut-over. The debtor and creditor tabs
+hold the subsidiary detail, which carries no journal of its own — posting those
+individually would double-count the control accounts and drag prior-year income
+into this year's P&L. Each tab shows whether the subsidiary agrees with its
+control account, so a half-finished load cannot pass unnoticed.
+
+**Batches** are created automatically the first time anything is posted into a
+month, so a posting can never fail for want of a batch. `/batches` also generates
+them ahead of time and locks them. Batch numbers follow the existing convention:
+year-month plus group code, so Sales for Jan 2026 is `260110`.
+
+**The period lock** was a field in Settings that nothing honoured. Every posting
+path now runs through one helper that checks the lock, checks the financial year
+is open, and files the entry in its batch — so no path can skip a check.
+
+**Year-end closing** (`/year-end`) zeroes the income and expenditure accounts into
+1000/0000 Accumulated Fund, records the surplus, and locks the year. It refuses to
+run while unposted drafts remain in the year, and it can be undone.
+
+**Cash book** (`/cash-book`) covers money with no resident or supplier behind it.
+Receipts print as receipts, payments as payment vouchers, and both appear in bank
+reconciliation alongside everything else.
+
+---
+
+## Still open
+
+Nothing here blocks day-to-day use.
+
+- Print Cheque, and cheque return handling on the debtor side
+- Debtor-side payment due and paid/unpaid listings (the creditor equivalents exist)
+- Fixed assets, gain/loss, transaction voucher listing, print range of accounts
+- Check Transaction and 12-month payment due enquiries
+- User account management and permissions — still a single admin role
+- Configurable reference numbering, and data import through the UI

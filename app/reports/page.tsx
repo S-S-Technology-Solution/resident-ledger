@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, BookOpen, TrendingUp, Scale, ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { ChevronRight, BookOpen, TrendingUp, Scale, ArrowDownRight, ArrowUpRight, Layers, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -15,6 +15,8 @@ const sections: Section[] = [
       { href: "/reports/trial-balance", title: "Trial Balance", description: "Debits and credits across all accounts for a period." },
       { href: "/reports/general-ledger", title: "General Ledger", description: "Posted transactions and running balance for an account." },
       { href: "/reports/cash-book", title: "Cash Book", description: "Bank and cash movements with running balance, per account." },
+      { href: "/reports/cash-flow", title: "Cash Flow Statement", description: "Where cash came from and went, between two dates." },
+      { href: "/reports/twelve-month", title: "12-Month Transaction Summary", description: "Sales, purchases, receipts and payments month by month." },
     ],
   },
   {
@@ -38,6 +40,7 @@ const sections: Section[] = [
       { href: "/reports/ar-ageing", title: "A/R Ageing Summary", description: "Outstanding resident balances bucketed by age." },
       { href: "/reports/collection", title: "Collection Report", description: "Billed vs collected per resident for a period." },
       { href: "/reports/payment-history", title: "Payment History (per Resident)", description: "All receipts and allocations for a single resident." },
+      { href: "/reports/debtor-ledger?kind=debtor", title: "Debtor Ledger", description: "Every invoice and payment for one resident, with a running balance." },
     ],
   },
   {
@@ -47,6 +50,23 @@ const sections: Section[] = [
       { href: "/reports/ap-ageing", title: "A/P Ageing", description: "Open supplier bills bucketed by age." },
       { href: "/reports/expense-by-category", title: "Expense by Category", description: "Posted expenses grouped by chart-of-accounts category." },
       { href: "/reports/expense-by-supplier", title: "Expense by Supplier", description: "Total billed amounts grouped by supplier." },
+      { href: "/reports/debtor-ledger?kind=creditor", title: "Creditor Ledger", description: "Every invoice and payment for one supplier, with a running balance." },
+      { href: "/reports/bill-listing?view=unpaid", title: "Bill Listing", description: "Unpaid, paid, and bills falling due — switchable in one place." },
+      { href: "/reports/remittance-advice", title: "Remittance Advice", description: "Which invoices a payment settled, to send on to the supplier." },
+    ],
+  },
+  {
+    title: "Batches",
+    icon: Layers,
+    items: [
+      { href: "/reports/batch-transactions", title: "Batch of Transactions", description: "Everything posted in one monthly batch, in detail or summary." },
+    ],
+  },
+  {
+    title: "Audit",
+    icon: ShieldCheck,
+    items: [
+      { href: "/reports/audit-trail", title: "Audit Trail", description: "Voids, deletions, opening balances and year-end closings." },
     ],
   },
 ];

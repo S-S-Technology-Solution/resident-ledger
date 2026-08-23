@@ -24,6 +24,7 @@ export default async function SuppliersPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-28">Creditor A/C</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Phone</TableHead>
@@ -35,6 +36,7 @@ export default async function SuppliersPage() {
           <TableBody>
             {rows.map((s) => (
               <TableRow key={s.id}>
+                <TableCell className="font-mono text-muted-foreground">{s.creditorCode ?? "—"}</TableCell>
                 <TableCell>{s.name}</TableCell>
                 <TableCell>{s.contact ?? "—"}</TableCell>
                 <TableCell>{s.phone ?? "—"}</TableCell>

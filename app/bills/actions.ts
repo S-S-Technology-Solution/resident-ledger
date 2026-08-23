@@ -6,7 +6,7 @@ import Decimal from "decimal.js";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { controlAccount, paymentMethodAccount } from "@/lib/control-accounts";
-import { nextEntryNo } from "@/lib/journal";
+import { prepareEntry } from "@/lib/journal";
 
 const billSchema = z.object({
   id: z.string().optional(),
@@ -30,12 +30,13 @@ export async function createBill(input: BillInput) {
   const expense = await db.account.findUnique({ where: { id: data.expenseAccountId } });
   if (!expense) throw new Error("Expense account not found");
 
-  const entryNo = await nextEntryNo();
+  const { entryNo, batchId } = await prepareEntry(new Date(data.date), "bill");
   const bill = await db.$transaction(async (tx) => {
     const entry = await tx.journalEntry.create({
       data: {
         associationId: DEFAULT_ASSOCIATION_ID,
         entryNo,
+        batchId,
         date: new Date(data.date),
         description: data.description || `Bill ${data.invoiceNo}`,
         reference: data.invoiceNo,
@@ -94,7 +95,7 @@ export async function payBill(input: z.infer<typeof paySchema>) {
 
   const ap = await controlAccount("AP");
   const cashOrBank = await paymentMethodAccount(data.method);
-  const entryNo = await nextEntryNo();
+  const { entryNo, batchId } = await prepareEntry(new Date(data.date), "billpayment");
   const newPaid = alreadyPaid.plus(amount);
   const newStatus = newPaid.gte(billAmount) ? "PAID" : "PARTIAL";
 
@@ -103,6 +104,7 @@ export async function payBill(input: z.infer<typeof paySchema>) {
       data: {
         associationId: DEFAULT_ASSOCIATION_ID,
         entryNo,
+        batchId,
         date: new Date(data.date),
         description: `Payment for ${bill.invoiceNo}`,
         reference: data.bankRef ?? bill.invoiceNo,
@@ -144,11 +146,12 @@ export async function voidBill(id: string, reason: string) {
     if (bill.entryId) {
       const entry = await tx.journalEntry.findUnique({ where: { id: bill.entryId }, include: { lines: true } });
       if (entry && entry.status === "POSTED") {
-        const reversalNo = await nextEntryNo();
+        const rev = await prepareEntry(new Date(), "reversal");
         await tx.journalEntry.create({
           data: {
             associationId: entry.associationId,
-            entryNo: reversalNo,
+            entryNo: rev.entryNo,
+            batchId: rev.batchId,
             date: new Date(),
             description: `Reversal of ${entry.entryNo}: ${reason}`,
             status: "POSTED",
@@ -180,11 +183,12 @@ export async function voidBillPayment(paymentId: string, reason: string) {
     if (payment.entryId) {
       const entry = await tx.journalEntry.findUnique({ where: { id: payment.entryId }, include: { lines: true } });
       if (entry && entry.status === "POSTED") {
-        const reversalNo = await nextEntryNo();
+        const rev = await prepareEntry(new Date(), "reversal");
         await tx.journalEntry.create({
           data: {
             associationId: entry.associationId,
-            entryNo: reversalNo,
+            entryNo: rev.entryNo,
+            batchId: rev.batchId,
             date: new Date(),
             description: `Reversal of ${entry.entryNo}: ${reason}`,
             status: "POSTED",

@@ -6,8 +6,9 @@ import Decimal from "decimal.js";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { controlAccount } from "@/lib/control-accounts";
-import { nextEntryNo } from "@/lib/journal";
+import { prepareEntry } from "@/lib/journal";
 import { nextInvoiceNo } from "@/lib/invoices";
+import { recordAudit } from "@/lib/audit";
 
 const schema = z.object({
   residentId: z.string().min(1),
@@ -27,7 +28,7 @@ async function createChargeWithJE(input: ChargeInput) {
 
   const ar = await controlAccount("AR");
   const income = await controlAccount("INCOME_FEE");
-  const entryNo = await nextEntryNo();
+  const { entryNo, batchId } = await prepareEntry(new Date(data.date), "charge");
   const invoiceNo = await nextInvoiceNo(DEFAULT_ASSOCIATION_ID, new Date(data.date));
 
   return db.$transaction(async (tx) => {
@@ -35,6 +36,7 @@ async function createChargeWithJE(input: ChargeInput) {
       data: {
         associationId: DEFAULT_ASSOCIATION_ID,
         entryNo,
+        batchId,
         date: new Date(data.date),
         description: data.description,
         status: "POSTED",
@@ -123,11 +125,12 @@ export async function voidCharge(id: string, reason: string) {
     if (charge.entryId) {
       const entry = await tx.journalEntry.findUnique({ where: { id: charge.entryId }, include: { lines: true } });
       if (entry && entry.status === "POSTED") {
-        const reversalNo = await nextEntryNo();
+        const rev = await prepareEntry(new Date(), "reversal");
         await tx.journalEntry.create({
           data: {
             associationId: entry.associationId,
-            entryNo: reversalNo,
+            entryNo: rev.entryNo,
+            batchId: rev.batchId,
             date: new Date(),
             description: `Reversal of ${entry.entryNo}: ${reason}`,
             status: "POSTED",
@@ -146,6 +149,7 @@ export async function voidCharge(id: string, reason: string) {
     }
     await tx.charge.update({ where: { id }, data: { voided: true } });
   });
+  await recordAudit("charge", id, "void", { before: { invoiceNo: charge.invoiceNo, amount: charge.amount.toString(), reason } });
   revalidatePath("/charges");
   revalidatePath(`/residents/${charge.residentId}`);
 }

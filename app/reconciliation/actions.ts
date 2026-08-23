@@ -36,3 +36,20 @@ export async function updatePaymentStatementRef(id: string, statementRef: string
   await db.billPayment.update({ where: { id }, data: { statementRef: statementRef || null } });
   revalidatePath("/reconciliation");
 }
+
+export async function setCashEntryCleared(id: string, cleared: boolean, statementRef?: string) {
+  await db.cashEntry.update({
+    where: { id },
+    data: {
+      cleared,
+      clearedAt: cleared ? new Date() : null,
+      statementRef: statementRef ?? undefined,
+    },
+  });
+  revalidatePath("/reconciliation");
+}
+
+export async function updateCashEntryStatementRef(id: string, statementRef: string) {
+  await db.cashEntry.update({ where: { id }, data: { statementRef: statementRef || null } });
+  revalidatePath("/reconciliation");
+}

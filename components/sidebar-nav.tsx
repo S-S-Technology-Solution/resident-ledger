@@ -16,6 +16,10 @@ import {
   Menu,
   Settings,
   Landmark,
+  Wallet,
+  Layers,
+  Scale,
+  CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -48,12 +52,21 @@ const groups: { title: string; items: Item[] }[] = [
     title: "Ledger",
     items: [
       { href: "/accounts", label: "Chart of Accounts", icon: BookOpen },
+      { href: "/cash-book", label: "Cash Book", icon: Wallet },
       { href: "/journal", label: "Journal", icon: ScrollText },
+      { href: "/batches", label: "Batches", icon: Layers },
       { href: "/reconciliation", label: "Bank Reconciliation", icon: Landmark },
     ],
   },
   { title: "Reports", items: [{ href: "/reports", label: "All Reports", icon: BarChart3 }] },
-  { title: "System", items: [{ href: "/settings", label: "Settings", icon: Settings }] },
+  {
+    title: "System",
+    items: [
+      { href: "/opening-balances", label: "Opening Balances", icon: Scale },
+      { href: "/year-end", label: "Year End Closing", icon: CalendarCheck },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 function NavBody({ onNavigate }: { onNavigate?: () => void }) {

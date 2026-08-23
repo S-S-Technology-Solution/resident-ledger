@@ -6,7 +6,8 @@ import { z } from "zod";
 import Decimal from "decimal.js";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
-import { linesBalance, nextEntryNo } from "@/lib/journal";
+import { linesBalance, prepareEntry } from "@/lib/journal";
+import { assertPeriodOpen } from "@/lib/periods";
 
 const lineSchema = z.object({
   accountId: z.string().min(1),
@@ -52,6 +53,7 @@ export async function saveDraft(input: EntryInput) {
     const existing = await db.journalEntry.findUnique({ where: { id: data.id } });
     if (!existing) throw new Error("Entry not found");
     if (existing.status !== "DRAFT") throw new Error("Only draft entries can be edited");
+    await assertPeriodOpen(new Date(data.date));
     await db.$transaction([
       db.journalLine.deleteMany({ where: { entryId: data.id } }),
       db.journalEntry.update({
@@ -71,11 +73,12 @@ export async function saveDraft(input: EntryInput) {
     return { id: data.id };
   }
 
-  const entryNo = await nextEntryNo();
+  const { entryNo, batchId } = await prepareEntry(new Date(data.date), "manual");
   const created = await db.journalEntry.create({
     data: {
       associationId: DEFAULT_ASSOCIATION_ID,
       entryNo,
+      batchId,
       date: new Date(data.date),
       description: data.description,
       reference: data.reference,
@@ -91,6 +94,7 @@ export async function postEntry(id: string) {
   const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
   if (!entry) throw new Error("Not found");
   if (entry.status !== "DRAFT") throw new Error("Only drafts can be posted");
+  await assertPeriodOpen(entry.date);
   validateLines(entry.lines.map((l) => ({
     accountId: l.accountId,
     debit: l.debit.toString(),
@@ -109,12 +113,13 @@ export async function voidEntry(id: string, reason: string) {
   const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
   if (!entry) throw new Error("Not found");
   if (entry.status !== "POSTED") throw new Error("Only posted entries can be voided");
-  const reversalNo = await nextEntryNo();
+  const rev = await prepareEntry(new Date(), "reversal");
   await db.$transaction(async (tx) => {
     await tx.journalEntry.create({
       data: {
         associationId: entry.associationId,
-        entryNo: reversalNo,
+        entryNo: rev.entryNo,
+        batchId: rev.batchId,
         date: new Date(),
         description: `Reversal of ${entry.entryNo}: ${reason}`,
         reference: entry.reference,

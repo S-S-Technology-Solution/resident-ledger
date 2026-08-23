@@ -4,13 +4,13 @@ import { ReactNode, useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { setReceiptCleared, setPaymentCleared, updateReceiptStatementRef, updatePaymentStatementRef } from "./actions";
+import { setReceiptCleared, setPaymentCleared, setCashEntryCleared, updateReceiptStatementRef, updatePaymentStatementRef, updateCashEntryStatementRef } from "./actions";
 import { fmtRM } from "@/lib/money";
 
 export function ReconcileRow({
   kind, id, cleared: initialCleared, date, code, label, bankRef, statementRef: initialRef, amount, amountTone,
 }: {
-  kind: "receipt" | "payment";
+  kind: "receipt" | "payment" | "cash";
   id: string;
   cleared: boolean;
   date: string;
@@ -31,6 +31,7 @@ export function ReconcileRow({
     start(async () => {
       try {
         if (kind === "receipt") await setReceiptCleared(id, next, ref);
+        else if (kind === "cash") await setCashEntryCleared(id, next, ref);
         else await setPaymentCleared(id, next, ref);
       } catch (e) {
         setCleared(!next);
@@ -44,6 +45,7 @@ export function ReconcileRow({
     start(async () => {
       try {
         if (kind === "receipt") await updateReceiptStatementRef(id, ref);
+        else if (kind === "cash") await updateCashEntryStatementRef(id, ref);
         else await updatePaymentStatementRef(id, ref);
         toast.success("Statement reference saved");
       } catch (e) {

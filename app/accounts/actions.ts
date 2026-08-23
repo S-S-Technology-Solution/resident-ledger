@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
+import { recordAudit } from "@/lib/audit";
 
 const upsertSchema = z.object({
   id: z.string().optional(),
@@ -70,5 +71,6 @@ export async function deleteAccount(id: string) {
   }
 
   await db.account.delete({ where: { id } });
+  await recordAudit("account", id, "delete", { before: { code: account.code, name: account.name } });
   revalidatePath("/accounts");
 }
