@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
+import { requirePosting } from "@/lib/permissions";
 
 const schema = z.object({
   id: z.string().optional(),
@@ -16,6 +17,7 @@ const schema = z.object({
 export type ResidentInput = z.infer<typeof schema>;
 
 export async function upsertResident(input: ResidentInput) {
+  await requirePosting();
   const data = schema.parse(input);
   if (data.id) {
     await db.resident.update({
@@ -42,6 +44,7 @@ export async function upsertResident(input: ResidentInput) {
 }
 
 export async function toggleResident(id: string, active: boolean) {
+  await requirePosting();
   await db.resident.update({ where: { id }, data: { active } });
   revalidatePath("/residents");
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createCashEntry, voidCashEntry } from "@/lib/cash-book";
 import { recordAudit } from "@/lib/audit";
+import { requirePosting } from "@/lib/permissions";
 
 const schema = z.object({
   direction: z.enum(["IN", "OUT"]),
@@ -18,6 +19,7 @@ const schema = z.object({
 });
 
 export async function createEntry(input: z.infer<typeof schema>) {
+  await requirePosting();
   const data = schema.parse(input);
   const entry = await createCashEntry(data);
   revalidatePath("/cash-book");
@@ -27,6 +29,7 @@ export async function createEntry(input: z.infer<typeof schema>) {
 }
 
 export async function voidEntry(id: string, reason: string) {
+  await requirePosting();
   if (!reason.trim()) throw new Error("A reason is required to void");
   await voidCashEntry(id, reason);
   await recordAudit("cashEntry", id, "void", { before: { reason } });

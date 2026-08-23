@@ -6,6 +6,8 @@ import { fmtRM } from "@/lib/money";
 import { amountInWords } from "@/lib/receipts";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/app/receipts/[id]/print-button";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { VoidCashEntryButton } from "./void-button";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +46,11 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
         </div>
         <div className="flex gap-2">
           <PrintButton />
+          {!isIn && !entry.voided && entry.method === "BANK" && (
+            <Button variant="outline" asChild>
+              <Link href={`/cheque/cash/${entry.id}`}>Print cheque</Link>
+            </Button>
+          )}
           {!entry.voided && <VoidCashEntryButton id={entry.id} refNo={entry.refNo} />}
         </div>
       </div>

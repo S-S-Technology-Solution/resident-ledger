@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
+import { requireAdmin } from "@/lib/permissions";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -17,6 +18,7 @@ const schema = z.object({
 export type SettingsInput = z.infer<typeof schema>;
 
 export async function saveSettings(input: SettingsInput) {
+  await requireAdmin();
   const data = schema.parse(input);
   await db.association.update({
     where: { id: DEFAULT_ASSOCIATION_ID },

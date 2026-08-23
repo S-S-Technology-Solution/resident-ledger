@@ -7,6 +7,7 @@ import { amountInWords } from "@/lib/receipts";
 import { Badge } from "@/components/ui/badge";
 import { VoidReceiptButton } from "./void-receipt-button";
 import { PrintButton } from "./print-button";
+import { ChequeReturnButton } from "./cheque-return-button";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,9 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
         </div>
         <div className="flex gap-2">
           <PrintButton />
+          {!receipt.voided && (
+            <ChequeReturnButton id={receipt.id} receiptNo={receipt.receiptNo} />
+          )}
           {!receipt.voided && <VoidReceiptButton id={receipt.id} />}
         </div>
       </div>

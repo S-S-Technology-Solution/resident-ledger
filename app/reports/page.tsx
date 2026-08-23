@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, BookOpen, TrendingUp, Scale, ArrowDownRight, ArrowUpRight, Layers, ShieldCheck } from "lucide-react";
+import { ChevronRight, BookOpen, TrendingUp, Scale, ArrowDownRight, ArrowUpRight, Layers, ShieldCheck, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -17,6 +17,7 @@ const sections: Section[] = [
       { href: "/reports/cash-book", title: "Cash Book", description: "Bank and cash movements with running balance, per account." },
       { href: "/reports/cash-flow", title: "Cash Flow Statement", description: "Where cash came from and went, between two dates." },
       { href: "/reports/twelve-month", title: "12-Month Transaction Summary", description: "Sales, purchases, receipts and payments month by month." },
+      { href: "/reports/account-range", title: "Range of Accounts", description: "Chart of accounts with balances, between two account codes." },
     ],
   },
   {
@@ -31,6 +32,7 @@ const sections: Section[] = [
     icon: Scale,
     items: [
       { href: "/reports/balance-sheet", title: "Balance Sheet", description: "Assets, liabilities and equity as of a date." },
+      { href: "/reports/fixed-assets", title: "Fixed Assets", description: "Cost less accumulated depreciation, with net book value." },
     ],
   },
   {
@@ -41,6 +43,7 @@ const sections: Section[] = [
       { href: "/reports/collection", title: "Collection Report", description: "Billed vs collected per resident for a period." },
       { href: "/reports/payment-history", title: "Payment History (per Resident)", description: "All receipts and allocations for a single resident." },
       { href: "/reports/debtor-ledger?kind=debtor", title: "Debtor Ledger", description: "Every invoice and payment for one resident, with a running balance." },
+      { href: "/reports/invoice-listing?view=unpaid", title: "Invoice Listing", description: "Unpaid, paid, and invoices falling due — switchable in one place." },
     ],
   },
   {
@@ -60,6 +63,13 @@ const sections: Section[] = [
     icon: Layers,
     items: [
       { href: "/reports/batch-transactions", title: "Batch of Transactions", description: "Everything posted in one monthly batch, in detail or summary." },
+    ],
+  },
+  {
+    title: "Enquiry",
+    icon: Search,
+    items: [
+      { href: "/reports/check-transaction", title: "Check Transaction", description: "Find a posting by amount, reference, description or date." },
     ],
   },
   {

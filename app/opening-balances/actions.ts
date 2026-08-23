@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { recordAudit } from "@/lib/audit";
+import { requireAdmin } from "@/lib/permissions";
 import {
   saveGLOpening,
   saveDebtorOpening,
@@ -24,6 +25,7 @@ const glSchema = z.object({
 });
 
 export async function saveGLOpeningBalances(input: z.infer<typeof glSchema>) {
+  await requireAdmin();
   const data = glSchema.parse(input);
   const result = await saveGLOpening(data.rows as GLOpeningRow[], new Date(data.date));
   await recordAudit("openingBalance", "gl", "save", { after: result });
@@ -38,6 +40,7 @@ const debtorSchema = z.object({
 });
 
 export async function saveDebtorOpeningBalances(input: z.infer<typeof debtorSchema>) {
+  await requireAdmin();
   const data = debtorSchema.parse(input);
   const result = await saveDebtorOpening(data.rows as DebtorOpeningRow[]);
   await recordAudit("openingBalance", "debtors", "save", { after: result });
@@ -52,6 +55,7 @@ const creditorSchema = z.object({
 });
 
 export async function saveCreditorOpeningBalances(input: z.infer<typeof creditorSchema>) {
+  await requireAdmin();
   const data = creditorSchema.parse(input);
   const result = await saveCreditorOpening(data.rows as CreditorOpeningRow[]);
   await recordAudit("openingBalance", "creditors", "save", { after: result });

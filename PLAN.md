@@ -35,7 +35,7 @@ Items marked **new** were built in this pass.
 - [x] Bank Reconciliation — now includes cash book entries — **new**
 - [x] Print Receipt
 - [x] Print Payment Voucher — **new**
-- [ ] Print Cheque
+- [x] Print Cheque — **new**
 
 ## Debtors
 
@@ -45,16 +45,16 @@ Entry:
 - [x] Debtor B/F transaction — opening balance per resident — **new**
 - [x] Sales invoice
 - [x] Receive Payment with invoice knock-off
-- [ ] Cheque return
+- [x] Cheque return — reverses the receipt, reopens the invoices, posts the bank fee — **new**
 
 Reports:
 
 - [x] Debtors Statement
 - [x] Debtors Aging
-- [ ] Debtors Payment Due
+- [x] Debtors Payment Due — **new**
 - [x] List Debtors Payment
-- [ ] List Paid Bills (debtor side)
-- [ ] List Unpaid Bills (debtor side)
+- [x] List Paid Bills (debtor side) — **new**
+- [x] List Unpaid Bills (debtor side) — **new**
 - [x] Print Official Receipt (A/R)
 - [x] Debtors Collection Report
 - ~ Debtors Outstanding Balance Report — the ageing report covers most of this
@@ -94,10 +94,10 @@ Reports:
 - [x] Export to PDF and Excel
 - [x] Cash Flow Statement — **new**
 - [x] Print Batch of Transaction — **new**
-- [ ] Fixed Assets Report
+- [x] Fixed Assets Report — **new**
 - [ ] Gain/Loss Report
-- [ ] Print Range of Accounts
-- [ ] Transaction Voucher Listing
+- [x] Print Range of Accounts — **new**
+- [x] Transaction Voucher Listing — folded into Check Transaction — **new**
 - [x] Audit Transaction — **new**
 - N/A Manufacturing, Project Ledger, Project Profit, Consolidated Account, Tourism Tax
 
@@ -106,15 +106,15 @@ Reports:
 - [x] Batch of Transaction — **new**
 - [x] 12-Month Transaction Summary — **new**
 - [ ] 12-Month Payment Due
-- [ ] Check Transaction
+- [x] Check Transaction — **new**
 - N/A Check Tax Entry
 
 ## Administration / System
 
 - [x] Association details for report headers
 - [x] Admin login and password change
-- [ ] User Account management — one role only, no user admin screen
-- [ ] User Group / permissions
+- [x] User Account management — **new**
+- [x] Roles and permissions — Administrator / Treasurer / View only, enforced on every action — **new**
 - [x] Year End Closing — **new**
 - [x] Period lock — now enforced on every posting path — **new**
 - [x] View Audit Trail — **new**
@@ -151,15 +151,25 @@ run while unposted drafts remain in the year, and it can be undone.
 Receipts print as receipts, payments as payment vouchers, and both appear in bank
 reconciliation alongside everything else.
 
+**Roles** (`/settings/users`) are Administrator, Treasurer and View only. Every
+mutating server action calls `requirePosting()` or `requireAdmin()` first — the
+gate is in the actions rather than the pages, so it cannot be walked around by
+reaching a URL directly. The last administrator cannot demote or deactivate
+themselves.
+
+**Cheque return** is deliberately separate from voiding a receipt: the reason
+shows on the resident's ledger, the reversal is dated when the bank returned it
+rather than today, and the bank's fee posts to 90B1 as a cost to the association
+rather than being folded into the reversal.
+
 ---
 
 ## Still open
 
 Nothing here blocks day-to-day use.
 
-- Print Cheque, and cheque return handling on the debtor side
-- Debtor-side payment due and paid/unpaid listings (the creditor equivalents exist)
-- Fixed assets, gain/loss, transaction voucher listing, print range of accounts
-- Check Transaction and 12-month payment due enquiries
-- User account management and permissions — still a single admin role
-- Configurable reference numbering, and data import through the UI
+- Gain/Loss report — no foreign currency or asset disposals yet, so nothing to report on
+- 12-month payment due enquiry — the payment due listings cover the same ground
+- List Creditors Payment — the creditor ledger and remittance advice cover it
+- Configurable reference numbering — prefixes are fixed in code
+- Data import through the UI — bulk loads still go through scripts in `prisma/`

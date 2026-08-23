@@ -48,6 +48,15 @@ enum CashDirection {
   OUT
 }
 
+// ADMIN   — everything, including users, settings, year-end and opening balances
+// TREASURER — day-to-day posting: invoices, receipts, bills, payments, journals
+// VIEWER  — read-only; reports and listings, no posting
+enum UserRole {
+  ADMIN
+  TREASURER
+  VIEWER
+}
+
 model Association {
   id              String    @id @default(cuid())
   name            String
@@ -111,7 +120,8 @@ model User {
   email         String      @unique
   passwordHash  String
   name          String
-  role          String      @default("admin")
+  role          UserRole    @default(ADMIN)
+  active        Boolean     @default(true)
   associationId String
   association   Association @relation(fields: [associationId], references: [id])
   createdAt     DateTime    @default(now())

@@ -5,12 +5,14 @@ import { closeYear, reopenYear, previewYearEnd } from "@/lib/year-end";
 import { currentSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
+import { requireAdmin } from "@/lib/permissions";
 
 export async function previewClosing(year: number) {
   return previewYearEnd(year);
 }
 
 export async function runYearEndClosing(year: number) {
+  await requireAdmin();
   const session = await currentSession();
   const user = session
     ? await db.user.findUnique({ where: { id: session.userId }, select: { name: true } })
@@ -25,6 +27,7 @@ export async function runYearEndClosing(year: number) {
 }
 
 export async function undoYearEndClosing(year: number) {
+  await requireAdmin();
   await reopenYear(year);
   await recordAudit("fiscalYear", String(year), "reopen");
   revalidatePath("/year-end");

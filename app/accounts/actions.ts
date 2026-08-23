@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { recordAudit } from "@/lib/audit";
+import { requireAdmin } from "@/lib/permissions";
 
 const upsertSchema = z.object({
   id: z.string().optional(),
@@ -19,6 +20,7 @@ const upsertSchema = z.object({
 export type UpsertAccountInput = z.infer<typeof upsertSchema>;
 
 export async function upsertAccount(input: UpsertAccountInput) {
+  await requireAdmin();
   const data = upsertSchema.parse(input);
   const payload = {
     name: data.name, code: data.code, type: data.type, normalSide: data.normalSide,
@@ -35,6 +37,7 @@ export async function upsertAccount(input: UpsertAccountInput) {
 }
 
 export async function toggleAccount(id: string, active: boolean) {
+  await requireAdmin();
   const used = await db.journalLine.count({ where: { accountId: id } });
   if (!active && used > 0) {
     throw new Error("Cannot deactivate an account that has journal entries. Continue using it or rename it.");
@@ -47,6 +50,7 @@ export async function toggleAccount(id: string, active: boolean) {
 const RESERVED_CODES = new Set(["3000/0000", "5000/0001", "3300/0000", "3300/0010", "4000/0000"]);
 
 export async function deleteAccount(id: string) {
+  await requireAdmin();
   const account = await db.account.findUnique({ where: { id } });
   if (!account) throw new Error("Account not found");
 

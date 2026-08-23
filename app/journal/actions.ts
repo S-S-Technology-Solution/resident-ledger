@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { linesBalance, prepareEntry } from "@/lib/journal";
 import { assertPeriodOpen } from "@/lib/periods";
+import { requirePosting } from "@/lib/permissions";
 
 const lineSchema = z.object({
   accountId: z.string().min(1),
@@ -46,6 +47,7 @@ function validateLines(lines: z.infer<typeof lineSchema>[]) {
 }
 
 export async function saveDraft(input: EntryInput) {
+  await requirePosting();
   const data = entrySchema.parse(input);
   const cleaned = validateLines(data.lines);
 
@@ -91,6 +93,7 @@ export async function saveDraft(input: EntryInput) {
 }
 
 export async function postEntry(id: string) {
+  await requirePosting();
   const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
   if (!entry) throw new Error("Not found");
   if (entry.status !== "DRAFT") throw new Error("Only drafts can be posted");
@@ -110,6 +113,7 @@ export async function postEntry(id: string) {
 }
 
 export async function voidEntry(id: string, reason: string) {
+  await requirePosting();
   const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
   if (!entry) throw new Error("Not found");
   if (entry.status !== "POSTED") throw new Error("Only posted entries can be voided");
@@ -148,5 +152,6 @@ export async function voidEntry(id: string, reason: string) {
 }
 
 export async function createDraftAndEdit() {
+  await requirePosting();
   redirect("/journal/new");
 }

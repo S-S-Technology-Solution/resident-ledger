@@ -13,6 +13,7 @@ import { Empty } from "@/components/empty";
 import { PayBillButton } from "./pay-bill-button";
 import { VoidBillButton } from "./void-bill-button";
 import { VoidPaymentButton } from "./void-payment-button";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +86,12 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
                   <TableCell>{format(p.date, "dd MMM yyyy")}</TableCell>
                   <TableCell className="text-right font-mono tabular">{fmtRM(p.amount)}</TableCell>
                   <TableCell>{p.bankRef ?? "—"}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-2">
+                    {p.method === "BANK" && bill.status !== "VOIDED" && (
+                      <Link href={`/cheque/bill/${p.id}`} className="text-sm text-primary hover:underline">
+                        Cheque
+                      </Link>
+                    )}
                     {bill.status !== "VOIDED" && <VoidPaymentButton id={p.id} />}
                   </TableCell>
                 </TableRow>

@@ -20,6 +20,7 @@ import {
   Layers,
   Scale,
   CalendarCheck,
+  UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -64,6 +65,7 @@ const groups: { title: string; items: Item[] }[] = [
     items: [
       { href: "/opening-balances", label: "Opening Balances", icon: Scale },
       { href: "/year-end", label: "Year End Closing", icon: CalendarCheck },
+      { href: "/settings/users", label: "Users", icon: UsersRound },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },

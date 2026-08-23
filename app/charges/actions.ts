@@ -9,6 +9,7 @@ import { controlAccount } from "@/lib/control-accounts";
 import { prepareEntry } from "@/lib/journal";
 import { nextInvoiceNo } from "@/lib/invoices";
 import { recordAudit } from "@/lib/audit";
+import { requirePosting } from "@/lib/permissions";
 
 const schema = z.object({
   residentId: z.string().min(1),
@@ -69,6 +70,7 @@ async function createChargeWithJE(input: ChargeInput) {
 }
 
 export async function createCharge(input: ChargeInput) {
+  await requirePosting();
   const c = await createChargeWithJE(input);
   revalidatePath("/charges");
   revalidatePath(`/residents/${input.residentId}`);
@@ -82,6 +84,7 @@ const bulkSchema = z.object({
 });
 
 export async function bulkGenerate(input: z.infer<typeof bulkSchema>) {
+  await requirePosting();
   const data = bulkSchema.parse(input);
   const residents = await db.resident.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },
@@ -110,6 +113,7 @@ export async function bulkGenerate(input: z.infer<typeof bulkSchema>) {
 }
 
 export async function voidCharge(id: string, reason: string) {
+  await requirePosting();
   const charge = await db.charge.findUnique({
     where: { id },
     include: { allocations: { include: { receipt: true } } },

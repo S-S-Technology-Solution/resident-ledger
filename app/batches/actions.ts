@@ -6,6 +6,7 @@ import { BatchGroup } from "@prisma/client";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { generateBatches } from "@/lib/batches";
+import { requireAdmin } from "@/lib/permissions";
 
 const schema = z.object({
   groups: z.array(z.enum(["SALES", "PURCHASE", "BANK", "JOURNAL", "WAGES"])).min(1),
@@ -16,6 +17,7 @@ const schema = z.object({
 });
 
 export async function generate(input: z.infer<typeof schema>) {
+  await requireAdmin();
   const d = schema.parse(input);
   if (d.toYear * 12 + d.toMonth < d.fromYear * 12 + d.fromMonth) {
     throw new Error("The end month falls before the start month");
@@ -29,11 +31,13 @@ export async function generate(input: z.infer<typeof schema>) {
 }
 
 export async function setBatchLocked(id: string, locked: boolean) {
+  await requireAdmin();
   await db.batch.update({ where: { id }, data: { locked } });
   revalidatePath("/batches");
 }
 
 export async function deleteBatch(id: string) {
+  await requireAdmin();
   const count = await db.journalEntry.count({ where: { batchId: id } });
   if (count > 0) {
     throw new Error(

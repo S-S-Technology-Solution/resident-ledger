@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { controlAccount, paymentMethodAccount } from "@/lib/control-accounts";
 import { prepareEntry } from "@/lib/journal";
+import { requirePosting } from "@/lib/permissions";
 
 const billSchema = z.object({
   id: z.string().optional(),
@@ -22,6 +23,7 @@ const billSchema = z.object({
 export type BillInput = z.infer<typeof billSchema>;
 
 export async function createBill(input: BillInput) {
+  await requirePosting();
   const data = billSchema.parse(input);
   const amount = new Decimal(data.amount);
   if (amount.lte(0)) throw new Error("Amount must be positive");
@@ -81,6 +83,7 @@ const paySchema = z.object({
 });
 
 export async function payBill(input: z.infer<typeof paySchema>) {
+  await requirePosting();
   const data = paySchema.parse(input);
   const amount = new Decimal(data.amount);
   if (amount.lte(0)) throw new Error("Amount must be positive");
@@ -138,6 +141,7 @@ export async function payBill(input: z.infer<typeof paySchema>) {
 }
 
 export async function voidBill(id: string, reason: string) {
+  await requirePosting();
   const bill = await db.bill.findUnique({ where: { id }, include: { payments: true } });
   if (!bill) throw new Error("Not found");
   if (bill.status === "VOIDED") throw new Error("Already voided");
@@ -174,6 +178,7 @@ export async function voidBill(id: string, reason: string) {
 }
 
 export async function voidBillPayment(paymentId: string, reason: string) {
+  await requirePosting();
   const payment = await db.billPayment.findUnique({ where: { id: paymentId } });
   if (!payment) throw new Error("Not found");
   const bill = await db.bill.findUnique({ where: { id: payment.billId } });
