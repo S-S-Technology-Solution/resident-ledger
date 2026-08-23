@@ -26,7 +26,7 @@ Items marked **new** were built in this pass.
 - [x] Two-part debtor account (control / sub, e.g. 3000/A01)
 - [x] Two-part creditor account (e.g. 4000/001) — **new**
 - [x] Account groups
-- ~ Default control accounts — set in code, no screen to change them
+- [x] Default control accounts — set under Settings › Control Accounts — **new**
 
 ## Cash Book
 
@@ -59,7 +59,7 @@ Reports:
 - [x] Debtors Collection Report
 - ~ Debtors Outstanding Balance Report — the ageing report covers most of this
 - [x] Print Debtors Ledger — **new**
-- [ ] Debtors Sales Report
+- [x] Debtors Sales Report — **new**
 - N/A Top Customer / Agent Sales / Agent Commission
 
 ## Creditors
@@ -76,7 +76,7 @@ Reports:
 - [x] Remittance Advice — **new**
 - [x] Creditors Aging
 - [x] Creditors Payment Due — **new**
-- [ ] List Creditors Payment
+- [x] List Creditors Payment — **new**
 - [x] List Paid Bills — **new**
 - [x] List Unpaid Bills — **new**
 - [x] Print Payment Voucher (A/P) — **new**
@@ -95,7 +95,7 @@ Reports:
 - [x] Cash Flow Statement — **new**
 - [x] Print Batch of Transaction — **new**
 - [x] Fixed Assets Report — **new**
-- [ ] Gain/Loss Report
+- N/A Gain/Loss Report — this is foreign-exchange gain or loss; everything here is in MYR
 - [x] Print Range of Accounts — **new**
 - [x] Transaction Voucher Listing — folded into Check Transaction — **new**
 - [x] Audit Transaction — **new**
@@ -105,7 +105,7 @@ Reports:
 
 - [x] Batch of Transaction — **new**
 - [x] 12-Month Transaction Summary — **new**
-- [ ] 12-Month Payment Due
+- ~ 12-Month Payment Due — the payment due listings cover the same ground by date rather than by month
 - [x] Check Transaction — **new**
 - N/A Check Tax Entry
 
@@ -118,8 +118,8 @@ Reports:
 - [x] Year End Closing — **new**
 - [x] Period lock — now enforced on every posting path — **new**
 - [x] View Audit Trail — **new**
-- ~ Reference numbering — invoice, receipt, voucher and entry numbers exist, not configurable
-- ~ Import / Export Data — export yes, import via scripts only
+- [x] Reference numbering — prefix, width and reset period per document type — **new**
+- [x] Import / Export Data — CSV import with a dry run, plus PDF and Excel export — **new**
 - N/A Backup Database — Neon has point-in-time recovery
 - N/A Report Setting, Fonts, Language, Change Key Code, Testing
 
@@ -162,14 +162,28 @@ shows on the resident's ledger, the reversal is dated when the bank returned it
 rather than today, and the bank's fee posts to 90B1 as a cost to the association
 rather than being folded into the reversal.
 
+**Control accounts and numbering** (`/settings/defaults`) were both hardcoded.
+Control accounts are now held as account codes on the association, so the chart
+of accounts can be reloaded without orphaning the mapping, and saving validates
+that every code exists and is active before it takes effect. Document numbering
+takes a prefix, width and reset period per document type; changing it only
+affects numbers issued from then on.
+
+**CSV import** (`/settings/import`) covers residents, suppliers, debtor opening
+balances and the chart of accounts. Checking a file runs the identical code path
+with writes switched off, so the preview cannot disagree with the result. Column
+names are matched loosely and money parses through thousands separators, currency
+prefixes and bracket negatives.
+
 ---
 
 ## Still open
 
-Nothing here blocks day-to-day use.
+Every function from the walkthrough is now either built, covered by an equivalent,
+or genuinely not applicable. What remains is marked `~` above:
 
-- Gain/Loss report — no foreign currency or asset disposals yet, so nothing to report on
-- 12-month payment due enquiry — the payment due listings cover the same ground
-- List Creditors Payment — the creditor ledger and remittance advice cover it
-- Configurable reference numbering — prefixes are fixed in code
-- Data import through the UI — bulk loads still go through scripts in `prisma/`
+- Outstanding balance reports, debtor and creditor — the ageing reports show the
+  same figures bucketed by age, which is more useful than a flat list
+- Creditors purchase report and top supplier — expense-by-supplier covers both
+- 12-month payment due — the payment due listings cover it by date rather than
+  laid out month by month

@@ -4,6 +4,7 @@ import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { prepareEntry } from "./journal";
 import { paymentMethodAccount } from "./control-accounts";
+import { nextNumber } from "./numbering";
 
 /**
  * Cash book — money in or out that has no debtor or creditor behind it. Bank
@@ -11,22 +12,20 @@ import { paymentMethodAccount } from "./control-accounts";
  * account, so it never touches the AR/AP control accounts.
  */
 
-/** CR-YYMMNN for receipts, PV-YYMMNN for payment vouchers. */
+/** Numbering comes from the sequence settings — CR- for receipts, PV- for vouchers. */
 export async function nextCashRefNo(
   direction: CashDirection,
   date: Date = new Date(),
   associationId = DEFAULT_ASSOCIATION_ID,
 ): Promise<string> {
-  const yy = String(date.getFullYear() % 100).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const prefix = `${direction === "IN" ? "CR" : "PV"}-${yy}${mm}`;
-  const last = await db.cashEntry.findFirst({
-    where: { associationId, refNo: { startsWith: prefix } },
-    orderBy: { refNo: "desc" },
-    select: { refNo: true },
-  });
-  const n = last ? parseInt(last.refNo.slice(prefix.length), 10) + 1 : 1;
-  return `${prefix}${String(n).padStart(2, "0")}`;
+  return nextNumber(direction === "IN" ? "CASH_IN" : "CASH_OUT", date, async (stem) => {
+    const last = await db.cashEntry.findFirst({
+      where: { associationId, refNo: { startsWith: stem } },
+      orderBy: { refNo: "desc" },
+      select: { refNo: true },
+    });
+    return last?.refNo ?? null;
+  }, associationId);
 }
 
 export type CashEntryInput = {

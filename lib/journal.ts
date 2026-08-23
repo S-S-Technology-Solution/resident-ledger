@@ -2,18 +2,21 @@ import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { assertPeriodOpen } from "./periods";
 import { ensureBatch, groupForSource } from "./batches";
+import { nextNumber } from "./numbering";
 import Decimal from "decimal.js";
 
-export async function nextEntryNo(associationId = DEFAULT_ASSOCIATION_ID): Promise<string> {
-  const year = new Date().getFullYear();
-  const prefix = `JE-${year}-`;
-  const last = await db.journalEntry.findFirst({
-    where: { associationId, entryNo: { startsWith: prefix } },
-    orderBy: { entryNo: "desc" },
-    select: { entryNo: true },
-  });
-  const n = last ? parseInt(last.entryNo.slice(prefix.length), 10) + 1 : 1;
-  return `${prefix}${String(n).padStart(5, "0")}`;
+export async function nextEntryNo(
+  associationId = DEFAULT_ASSOCIATION_ID,
+  date: Date = new Date(),
+): Promise<string> {
+  return nextNumber("JOURNAL", date, async (stem) => {
+    const last = await db.journalEntry.findFirst({
+      where: { associationId, entryNo: { startsWith: stem } },
+      orderBy: { entryNo: "desc" },
+      select: { entryNo: true },
+    });
+    return last?.entryNo ?? null;
+  }, associationId);
 }
 
 /**
@@ -28,7 +31,7 @@ export async function prepareEntry(
 ): Promise<{ entryNo: string; batchId: string }> {
   await assertPeriodOpen(date, associationId);
   const batch = await ensureBatch(groupForSource(source), date, associationId);
-  const entryNo = await nextEntryNo(associationId);
+  const entryNo = await nextEntryNo(associationId, date);
   return { entryNo, batchId: batch.id };
 }
 

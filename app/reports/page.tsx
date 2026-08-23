@@ -44,6 +44,7 @@ const sections: Section[] = [
       { href: "/reports/payment-history", title: "Payment History (per Resident)", description: "All receipts and allocations for a single resident." },
       { href: "/reports/debtor-ledger?kind=debtor", title: "Debtor Ledger", description: "Every invoice and payment for one resident, with a running balance." },
       { href: "/reports/invoice-listing?view=unpaid", title: "Invoice Listing", description: "Unpaid, paid, and invoices falling due — switchable in one place." },
+      { href: "/reports/sales-report", title: "Debtors Sales Report", description: "What was invoiced to each resident, and how much has been settled." },
     ],
   },
   {
@@ -56,6 +57,7 @@ const sections: Section[] = [
       { href: "/reports/debtor-ledger?kind=creditor", title: "Creditor Ledger", description: "Every invoice and payment for one supplier, with a running balance." },
       { href: "/reports/bill-listing?view=unpaid", title: "Bill Listing", description: "Unpaid, paid, and bills falling due — switchable in one place." },
       { href: "/reports/remittance-advice", title: "Remittance Advice", description: "Which invoices a payment settled, to send on to the supplier." },
+      { href: "/reports/creditor-payments", title: "Creditor Payments", description: "Every payment made to suppliers over a period." },
     ],
   },
   {

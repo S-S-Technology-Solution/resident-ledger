@@ -67,6 +67,13 @@ model Association {
   lockedThrough   DateTime?
   // Cut-over date: the day the previous system's closing balances were struck.
   openingDate     DateTime?
+  // Control accounts, held as account codes so they can be re-pointed without a
+  // code change. Null falls back to the built-in default for that role.
+  ctlAr           String?
+  ctlIncomeFee    String?
+  ctlBank         String?
+  ctlCash         String?
+  ctlAp           String?
   createdAt       DateTime  @default(now())
 
   accounts  Account[]
@@ -78,8 +85,25 @@ model Association {
   bills     Bill[]
   users       User[]
   batches     Batch[]
+  sequences   NumberSequence[]
   years       FiscalYear[]
   cashEntries CashEntry[]
+}
+
+// Document numbering, one row per document type. Mirrors Million's Reference No.
+// maintenance so prefixes are not baked into the code.
+model NumberSequence {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  key           String
+  prefix        String
+  padding       Int         @default(2)
+  // true: sequence restarts each month and the number carries YYMM
+  // false: a single running sequence carrying the year
+  resetMonthly  Boolean     @default(true)
+
+  @@unique([associationId, key])
 }
 
 model Batch {

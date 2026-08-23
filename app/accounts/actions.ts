@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { recordAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/permissions";
+import { reservedAccountCodes } from "@/lib/control-accounts";
 
 const upsertSchema = z.object({
   id: z.string().optional(),
@@ -46,15 +47,14 @@ export async function toggleAccount(id: string, active: boolean) {
   revalidatePath("/accounts");
 }
 
-// Control account codes required by the system — never deletable.
-const RESERVED_CODES = new Set(["3000/0000", "5000/0001", "3300/0000", "3300/0010", "4000/0000"]);
-
 export async function deleteAccount(id: string) {
   await requireAdmin();
   const account = await db.account.findUnique({ where: { id } });
   if (!account) throw new Error("Account not found");
 
-  if (RESERVED_CODES.has(account.code)) {
+  // Whatever the control accounts currently point at must survive.
+  const reserved = await reservedAccountCodes();
+  if (reserved.has(account.code)) {
     throw new Error(`${account.code} is a system control account and cannot be deleted.`);
   }
 
