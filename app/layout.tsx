@@ -4,6 +4,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { DesktopSidebar } from "@/components/sidebar-nav";
 import { Topbar } from "@/components/topbar";
 import { currentSession } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/permissions";
+import { clearSessionCookie } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -16,6 +19,17 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await currentSession().catch(() => null);
+
+  // Middleware runs on the edge and can only check the cookie's signature, so a
+  // user deactivated mid-session would keep read access until it expired. Catch
+  // that here, where the database is reachable.
+  if (session) {
+    const user = await getCurrentUser().catch(() => null);
+    if (!user || !user.active) {
+      await clearSessionCookie().catch(() => {});
+      redirect("/login");
+    }
+  }
 
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>

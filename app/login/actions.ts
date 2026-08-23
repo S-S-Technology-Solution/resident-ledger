@@ -24,6 +24,8 @@ export async function loginAction(formData: FormData) {
   if (!user) return { error: "Invalid email or password" };
   const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
   if (!ok) return { error: "Invalid email or password" };
+  // Checked after the password so a wrong guess cannot reveal that an account exists.
+  if (!user.active) return { error: "This account has been deactivated. Ask an administrator." };
 
   await setSessionCookie(user.id);
   redirect(parsed.data.next && parsed.data.next.startsWith("/") ? parsed.data.next : "/");
