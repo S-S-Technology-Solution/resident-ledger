@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Landmark } from "lucide-react";
 import Link from "next/link";
+import { controlAccount } from "@/lib/control-accounts";
+import { OPENING_SOURCE } from "@/lib/opening-balances";
 import { ReconcileRow } from "./reconcile-row";
 import { StatementBalance } from "./statement-balance";
 
@@ -23,11 +25,21 @@ export default async function ReconciliationPage({
   searchParams: Promise<Search>;
 }) {
   const { method = "BANK", from, to } = await searchParams;
-  const dateFilter = (from || to)
-    ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } }
-    : {};
+  // Balances are cumulative up to the statement date, so totals take everything
+  // up to `to`; `from` only narrows the rows listed below.
+  const dateFilter = to ? { date: { lte: new Date(to) } } : {};
+  const account = await controlAccount(method === "BANK" ? "BANK" : "CASH");
 
-  const [receipts, payments, cashEntries] = await Promise.all([
+  const [opening, allReceipts, allPayments, cashEntries] = await Promise.all([
+    // Balance brought forward from the previous system. The statement's closing
+    // balance includes it, so the book balance has to as well.
+    db.journalLine.aggregate({
+      where: {
+        accountId: account.id,
+        entry: { associationId: DEFAULT_ASSOCIATION_ID, source: OPENING_SOURCE, status: "POSTED" },
+      },
+      _sum: { debit: true, credit: true },
+    }),
     db.receipt.findMany({
       where: {
         associationId: DEFAULT_ASSOCIATION_ID,
@@ -61,20 +73,28 @@ export default async function ReconciliationPage({
 
   // Cash book entries hit the same bank account, so they belong in the same
   // reconciliation as resident receipts and supplier payments.
-  const cashIn = cashEntries.filter((c) => c.direction === "IN");
-  const cashOut = cashEntries.filter((c) => c.direction === "OUT");
+  const allCashIn = cashEntries.filter((c) => c.direction === "IN");
+  const allCashOut = cashEntries.filter((c) => c.direction === "OUT");
 
   const sumIf = <T extends { cleared: boolean; amount: unknown }>(rows: T[], cleared: boolean) =>
     rows.filter((r) => r.cleared === cleared).reduce((s, r) => s + Number(r.amount), 0);
 
-  const clearedIn = sumIf(receipts, true) + sumIf(cashIn, true);
-  const clearedOut = sumIf(payments, true) + sumIf(cashOut, true);
-  const unclearedIn = sumIf(receipts, false) + sumIf(cashIn, false);
-  const unclearedOut = sumIf(payments, false) + sumIf(cashOut, false);
-  const bookBalanceCleared = clearedIn - clearedOut;
+  const openingBalance = Number(opening._sum.debit ?? 0) - Number(opening._sum.credit ?? 0);
+  const clearedIn = sumIf(allReceipts, true) + sumIf(allCashIn, true);
+  const clearedOut = sumIf(allPayments, true) + sumIf(allCashOut, true);
+  const unclearedIn = sumIf(allReceipts, false) + sumIf(allCashIn, false);
+  const unclearedOut = sumIf(allPayments, false) + sumIf(allCashOut, false);
+  const bookBalanceCleared = openingBalance + clearedIn - clearedOut;
   const bookBalanceTotal = bookBalanceCleared + unclearedIn - unclearedOut;
 
-  const accountLabel = method === "BANK" ? "RHB Bank (3300/0000)" : "Cash (3300/0010)";
+  const fromDate = from ? new Date(from) : null;
+  const shown = <T extends { date: Date }>(rows: T[]) => (fromDate ? rows.filter((r) => r.date >= fromDate) : rows);
+  const receipts = shown(allReceipts);
+  const payments = shown(allPayments);
+  const cashIn = shown(allCashIn);
+  const cashOut = shown(allCashOut);
+
+  const accountLabel = `${account.name} (${account.code})`;
 
   return (
     <div className="space-y-6">
@@ -105,7 +125,8 @@ export default async function ReconciliationPage({
         )}
       </form>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
+        <StatBox label="Brought forward" value={fmtRM(openingBalance)} tone="neutral" />
         <StatBox label="Cleared in" value={fmtRM(clearedIn)} tone="positive" />
         <StatBox label="Cleared out" value={fmtRM(clearedOut)} tone="negative" />
         <StatBox label="Book balance (cleared)" value={fmtRM(bookBalanceCleared)} tone="neutral" highlight />
