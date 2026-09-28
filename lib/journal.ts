@@ -1,4 +1,3 @@
-import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { assertPeriodOpen } from "./periods";
 import { ensureBatch, groupForSource } from "./batches";
@@ -9,14 +8,7 @@ export async function nextEntryNo(
   associationId = DEFAULT_ASSOCIATION_ID,
   date: Date = new Date(),
 ): Promise<string> {
-  return nextNumber("JOURNAL", date, async (stem) => {
-    const last = await db.journalEntry.findFirst({
-      where: { associationId, entryNo: { startsWith: stem } },
-      orderBy: { entryNo: "desc" },
-      select: { entryNo: true },
-    });
-    return last?.entryNo ?? null;
-  }, associationId);
+  return nextNumber("JOURNAL", date, associationId);
 }
 
 /**

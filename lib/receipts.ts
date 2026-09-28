@@ -1,4 +1,3 @@
-import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { nextNumber } from "./numbering";
 
@@ -6,14 +5,7 @@ export async function nextReceiptNo(
   associationId = DEFAULT_ASSOCIATION_ID,
   date: Date = new Date(),
 ): Promise<string> {
-  return nextNumber("RECEIPT", date, async (stem) => {
-    const last = await db.receipt.findFirst({
-      where: { associationId, receiptNo: { startsWith: stem } },
-      orderBy: { receiptNo: "desc" },
-      select: { receiptNo: true },
-    });
-    return last?.receiptNo ?? null;
-  }, associationId);
+  return nextNumber("RECEIPT", date, associationId);
 }
 
 export function amountInWords(amount: number): string {

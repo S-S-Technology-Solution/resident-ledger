@@ -18,14 +18,7 @@ export async function nextCashRefNo(
   date: Date = new Date(),
   associationId = DEFAULT_ASSOCIATION_ID,
 ): Promise<string> {
-  return nextNumber(direction === "IN" ? "CASH_IN" : "CASH_OUT", date, async (stem) => {
-    const last = await db.cashEntry.findFirst({
-      where: { associationId, refNo: { startsWith: stem } },
-      orderBy: { refNo: "desc" },
-      select: { refNo: true },
-    });
-    return last?.refNo ?? null;
-  }, associationId);
+  return nextNumber(direction === "IN" ? "CASH_IN" : "CASH_OUT", date, associationId);
 }
 
 export type CashEntryInput = {

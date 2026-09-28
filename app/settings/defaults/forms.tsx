@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DataCard } from "@/components/data-card";
 import { toast } from "sonner";
 import { saveControlAccounts, saveSequences } from "./actions";
+import { stemFor, type SequenceReset } from "@/lib/numbering-format";
 
 type Account = { code: string; name: string };
 type ControlRow = { key: string; label: string; description: string; code: string };
@@ -80,16 +81,13 @@ type SeqRow = {
   label: string;
   prefix: string;
   padding: number;
-  resetMonthly: boolean;
+  reset: SequenceReset;
+  startAt: number;
   isDefault: boolean;
 };
 
-function preview(prefix: string, padding: number, resetMonthly: boolean) {
-  const now = new Date();
-  const yy = String(now.getFullYear() % 100).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const stem = resetMonthly ? `${prefix}${yy}${mm}` : `${prefix}${now.getFullYear()}-`;
-  return `${stem}${"1".padStart(padding, "0")}`;
+function preview(r: SeqRow) {
+  return `${stemFor(r, new Date())}${String(r.startAt).padStart(r.padding, "0")}`;
 }
 
 export function SequenceForm({ rows: initial, readOnly }: { rows: SeqRow[]; readOnly: boolean }) {
@@ -105,7 +103,7 @@ export function SequenceForm({ rows: initial, readOnly }: { rows: SeqRow[]; read
       try {
         await saveSequences({
           rows: rows.map((r) => ({
-            key: r.key, prefix: r.prefix, padding: r.padding, resetMonthly: r.resetMonthly,
+            key: r.key, prefix: r.prefix, padding: r.padding, reset: r.reset, startAt: r.startAt,
           })),
         });
         toast.success("Numbering saved");
@@ -125,6 +123,7 @@ export function SequenceForm({ rows: initial, readOnly }: { rows: SeqRow[]; read
               <TableHead className="w-32">Prefix</TableHead>
               <TableHead className="w-24">Digits</TableHead>
               <TableHead className="w-40">Restarts</TableHead>
+              <TableHead className="w-28">Starts at</TableHead>
               <TableHead className="w-44">Next looks like</TableHead>
             </TableRow>
           </TableHeader>
@@ -153,19 +152,31 @@ export function SequenceForm({ rows: initial, readOnly }: { rows: SeqRow[]; read
                 </TableCell>
                 <TableCell>
                   <Select
-                    value={r.resetMonthly ? "monthly" : "yearly"}
-                    onValueChange={(v) => update(r.key, { resetMonthly: v === "monthly" })}
+                    value={r.reset}
+                    onValueChange={(v) => update(r.key, { reset: v as SequenceReset })}
                     disabled={readOnly}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="monthly">Every month</SelectItem>
-                      <SelectItem value="yearly">Every year</SelectItem>
+                      <SelectItem value="MONTHLY">Every month</SelectItem>
+                      <SelectItem value="YEARLY">Every year</SelectItem>
+                      <SelectItem value="NEVER">Never (running number)</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>
+                <TableCell>
+                  <Input
+                    className="w-24 text-right font-mono"
+                    value={String(r.startAt)}
+                    disabled={readOnly}
+                    onChange={(e) => {
+                      const n = Number(e.target.value.replace(/\D/g, ""));
+                      if (n >= 1 && n <= 99_999_999) update(r.key, { startAt: n });
+                    }}
+                  />
+                </TableCell>
                 <TableCell className="font-mono text-muted-foreground">
-                  {preview(r.prefix, r.padding, r.resetMonthly)}
+                  {preview(r)}
                 </TableCell>
               </TableRow>
             ))}
@@ -175,7 +186,8 @@ export function SequenceForm({ rows: initial, readOnly }: { rows: SeqRow[]; read
 
       <p className="text-xs text-muted-foreground">
         Changing a prefix or width only affects numbers issued from now on — documents already
-        issued keep the number they were given.
+        issued keep the number they were given. &ldquo;Starts at&rdquo; is used when nothing has been
+        issued yet under that prefix, or when it is higher than the last number issued.
       </p>
 
       {!readOnly && (

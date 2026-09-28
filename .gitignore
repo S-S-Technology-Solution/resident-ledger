@@ -46,3 +46,6 @@ next-env.d.ts
 .idea/
 *.iml
 .env*.local
+
+# local data backups (contain resident personal data)
+/backups/

@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { requireAdmin } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
-import { SEQUENCE_KEYS, type SequenceKey } from "@/lib/numbering";
+import { SEQUENCE_KEYS, SEQUENCE_RESETS, type SequenceKey } from "@/lib/numbering";
 
 const controlSchema = z.object({
   AR: z.string().min(1),
@@ -59,7 +59,8 @@ const sequenceSchema = z.object({
     key: z.string().min(1),
     prefix: z.string().max(10),
     padding: z.number().int().min(1).max(8),
-    resetMonthly: z.boolean(),
+    reset: z.enum(SEQUENCE_RESETS as [string, ...string[]]),
+    startAt: z.number().int().min(1).max(99_999_999),
   })),
 });
 
@@ -71,13 +72,14 @@ export async function saveSequences(input: z.infer<typeof sequenceSchema>) {
     if (!SEQUENCE_KEYS.includes(row.key as SequenceKey)) continue;
     await db.numberSequence.upsert({
       where: { associationId_key: { associationId: DEFAULT_ASSOCIATION_ID, key: row.key } },
-      update: { prefix: row.prefix, padding: row.padding, resetMonthly: row.resetMonthly },
+      update: { prefix: row.prefix, padding: row.padding, reset: row.reset, startAt: row.startAt },
       create: {
         associationId: DEFAULT_ASSOCIATION_ID,
         key: row.key,
         prefix: row.prefix,
         padding: row.padding,
-        resetMonthly: row.resetMonthly,
+        reset: row.reset,
+        startAt: row.startAt,
       },
     });
   }

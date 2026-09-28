@@ -99,9 +99,13 @@ model NumberSequence {
   key           String
   prefix        String
   padding       Int         @default(2)
-  // true: sequence restarts each month and the number carries YYMM
-  // false: a single running sequence carrying the year
-  resetMonthly  Boolean     @default(true)
+  // MONTHLY: restarts each month and the number carries YYMM (OR-260901)
+  // YEARLY:  restarts each year and the number carries the year (JE-2026-00001)
+  // NEVER:   one running sequence with no date part (A1004)
+  reset         String      @default("MONTHLY")
+  // First number issued when nothing has been issued yet under the stem, e.g.
+  // 1004 to carry on from the last manual receipt book.
+  startAt       Int         @default(1)
 
   @@unique([associationId, key])
 }
