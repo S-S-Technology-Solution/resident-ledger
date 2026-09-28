@@ -84,7 +84,7 @@ async function highestIssued(key: SequenceKey, stem: string, associationId: stri
   const rows = await db.$queryRawUnsafe<{ no: string }[]>(
     `SELECT "${column}" AS no FROM "${table}"
       WHERE "associationId" = $1 AND "${column}" LIKE $2
-        AND substring("${column}" from $3) ~ '^[0-9]+$'
+        AND substring("${column}" from $3::int) ~ '^[0-9]+$'
       ORDER BY length("${column}") DESC, "${column}" DESC
       LIMIT 1`,
     associationId, like, stem.length + 1,
