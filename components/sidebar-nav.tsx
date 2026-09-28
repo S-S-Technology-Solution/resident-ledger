@@ -23,6 +23,7 @@ import {
   UsersRound,
   Upload,
   SlidersHorizontal,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -58,6 +59,7 @@ const groups: { title: string; items: Item[] }[] = [
       { href: "/cash-book", label: "Cash Book", icon: Wallet },
       { href: "/journal", label: "Journal", icon: ScrollText },
       { href: "/batches", label: "Batches", icon: Layers },
+      { href: "/bank-statements", label: "Bank Statements", icon: FileSpreadsheet },
       { href: "/reconciliation", label: "Bank Reconciliation", icon: Landmark },
     ],
   },

@@ -88,6 +88,7 @@ model Association {
   sequences   NumberSequence[]
   years       FiscalYear[]
   cashEntries CashEntry[]
+  statements  BankStatement[]
 }
 
 // Document numbering, one row per document type. Mirrors Million's Reference No.
@@ -402,4 +403,55 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
+}
+
+// A bank statement as uploaded, one row per statement period. The lines are the
+// bank's record; reconciling means pairing each line with the book entry it
+// represents, so the difference between bank and book is only timing.
+model BankStatement {
+  id             String      @id @default(cuid())
+  associationId  String
+  association    Association @relation(fields: [associationId], references: [id])
+  bank           String      @default("RHB")
+  accountNo      String
+  periodFrom     DateTime
+  periodTo       DateTime
+  openingBalance Decimal     @db.Decimal(15, 2)
+  closingBalance Decimal     @db.Decimal(15, 2)
+  fileName       String
+  uploadedBy     String?
+  uploadedAt     DateTime    @default(now())
+  // Set when the accountant agrees the reconciliation; the lines are then frozen.
+  reconciledAt   DateTime?
+  reconciledBy   String?
+
+  lines BankStatementLine[]
+
+  @@unique([associationId, accountNo, periodFrom])
+  @@index([associationId, periodTo])
+}
+
+model BankStatementLine {
+  id          String        @id @default(cuid())
+  statementId String
+  statement   BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  // Stable reference quoted on the book entry's statementRef, e.g. B2602-005.
+  ref         String
+  date        DateTime
+  type        String
+  serial      String?
+  details     String        @default("")
+  debit       Decimal       @default(0) @db.Decimal(15, 2)
+  credit      Decimal       @default(0) @db.Decimal(15, 2)
+  balance     Decimal       @db.Decimal(15, 2)
+  // What the line was paired with: receipt | billPayment | cashEntry, or
+  // "none" for a line that needs no book entry (e.g. a bounced cheque that was
+  // presented again). Null while unmatched.
+  matchKind   String?
+  matchId     String?
+  note        String?
+
+  @@unique([statementId, lineNo])
+  @@index([matchKind, matchId])
 }
