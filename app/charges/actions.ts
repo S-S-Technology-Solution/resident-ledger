@@ -5,73 +5,16 @@ import { z } from "zod";
 import Decimal from "decimal.js";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
-import { controlAccount } from "@/lib/control-accounts";
 import { prepareEntry } from "@/lib/journal";
-import { nextInvoiceNo } from "@/lib/invoices";
 import { recordAudit } from "@/lib/audit";
 import { requirePosting } from "@/lib/permissions";
+import { postCharge, type ChargeInput } from "@/lib/charge-posting";
 
-const schema = z.object({
-  residentId: z.string().min(1),
-  date: z.string().min(1),
-  periodMonth: z.number().int().min(1).max(12),
-  periodYear: z.number().int().min(2000).max(2100),
-  amount: z.string(),
-  description: z.string().min(1),
-});
-
-export type ChargeInput = z.infer<typeof schema>;
-
-async function createChargeWithJE(input: ChargeInput) {
-  const data = schema.parse(input);
-  const amount = new Decimal(data.amount);
-  if (amount.lte(0)) throw new Error("Amount must be positive");
-
-  const ar = await controlAccount("AR");
-  const income = await controlAccount("INCOME_FEE");
-  const { entryNo, batchId } = await prepareEntry(new Date(data.date), "charge");
-  const invoiceNo = await nextInvoiceNo(DEFAULT_ASSOCIATION_ID, new Date(data.date));
-
-  return db.$transaction(async (tx) => {
-    const entry = await tx.journalEntry.create({
-      data: {
-        associationId: DEFAULT_ASSOCIATION_ID,
-        entryNo,
-        batchId,
-        date: new Date(data.date),
-        description: data.description,
-        status: "POSTED",
-        source: "charge",
-        postedAt: new Date(),
-        lines: {
-          create: [
-            { accountId: ar.id, debit: amount.toFixed(2), credit: "0", lineNo: 1 },
-            { accountId: income.id, debit: "0", credit: amount.toFixed(2), lineNo: 2 },
-          ],
-        },
-      },
-    });
-    const charge = await tx.charge.create({
-      data: {
-        associationId: DEFAULT_ASSOCIATION_ID,
-        residentId: data.residentId,
-        invoiceNo,
-        periodMonth: data.periodMonth,
-        periodYear: data.periodYear,
-        amount: amount.toFixed(2),
-        description: data.description,
-        date: new Date(data.date),
-        entryId: entry.id,
-      },
-    });
-    await tx.journalEntry.update({ where: { id: entry.id }, data: { sourceId: charge.id } });
-    return charge;
-  });
-}
+export type { ChargeInput } from "@/lib/charge-posting";
 
 export async function createCharge(input: ChargeInput) {
   await requirePosting();
-  const c = await createChargeWithJE(input);
+  const c = await postCharge(input);
   revalidatePath("/charges");
   revalidatePath(`/residents/${input.residentId}`);
   return { id: c.id };
@@ -97,7 +40,7 @@ export async function bulkGenerate(input: z.infer<typeof bulkSchema>) {
       where: { residentId: r.id, periodMonth: data.periodMonth, periodYear: data.periodYear, voided: false },
     });
     if (existing) { skipped++; continue; }
-    await createChargeWithJE({
+    await postCharge({
       residentId: r.id,
       date: data.date,
       periodMonth: data.periodMonth,
