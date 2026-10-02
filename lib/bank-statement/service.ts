@@ -91,40 +91,53 @@ async function openingBookBalance(associationId = DEFAULT_ASSOCIATION_ID) {
   return new Decimal(sum._sum.debit?.toString() ?? 0).minus(sum._sum.credit?.toString() ?? 0);
 }
 
-/** Bank-method book items, each with the statement line it is paired to, if any. */
-export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID) {
+/**
+ * Bank-method book items, each with the statement line it is paired to, if any.
+ * With `includeVoided`, voided receipts and cash entries come back too, carrying
+ * the date their reversal was posted: until that date they are still in the
+ * books, which the reconciliation of an earlier month must reflect.
+ */
+export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includeVoided = false } = {}) {
+  const voided = includeVoided ? {} : { voided: false };
   const [receipts, payments, cash, matched] = await Promise.all([
     db.receipt.findMany({
-      where: { associationId, method: "BANK", voided: false, isOpeningBalance: false },
+      where: { associationId, method: "BANK", ...voided, isOpeningBalance: false },
       include: { resident: { select: { ownerName: true, unitAddress: true } } },
     }),
     db.billPayment.findMany({
       where: { method: "BANK", bill: { associationId, status: { not: "VOIDED" } } },
       include: { bill: { select: { invoiceNo: true, supplier: { select: { name: true } } } } },
     }),
-    db.cashEntry.findMany({ where: { associationId, method: "BANK", voided: false } }),
+    db.cashEntry.findMany({ where: { associationId, method: "BANK", ...voided } }),
     db.bankStatementLine.findMany({
       where: { matchKind: { in: ["receipt", "billPayment", "cashEntry"] }, statement: { associationId } },
       select: { matchKind: true, matchId: true, date: true, ref: true },
     }),
   ]);
   const lineFor = new Map(matched.map((m) => [`${m.matchKind}:${m.matchId}`, m]));
+  const voidedEntryIds = [...receipts, ...cash].filter((x) => x.voided && x.entryId).map((x) => x.entryId!);
+  const reversals = voidedEntryIds.length
+    ? await db.journalEntry.findMany({ where: { reversesId: { in: voidedEntryIds } }, select: { reversesId: true, date: true } })
+    : [];
+  const reversedOn = new Map(reversals.map((r) => [r.reversesId!, r.date]));
+  const voidedOn = (x: { voided: boolean; entryId: string | null; date: Date }) =>
+    x.voided ? (x.entryId ? reversedOn.get(x.entryId) : undefined) ?? x.date : null;
 
-  const items: (BookItem & { href: string; line: { date: Date; ref: string } | null })[] = [
+  const items: (BookItem & { href: string; voidedOn: Date | null; line: { date: Date; ref: string } | null })[] = [
     ...receipts.map((r) => ({
       kind: "receipt" as const, id: r.id, date: r.date, amount: Number(r.amount), direction: "IN" as const,
       ref: r.receiptNo, label: `${r.resident.ownerName} — ${r.resident.unitAddress}`,
-      bankRef: r.bankRef, chequeNo: null, residentId: r.residentId, href: `/receipts/${r.id}`,
+      bankRef: r.bankRef, chequeNo: null, residentId: r.residentId, href: `/receipts/${r.id}`, voidedOn: voidedOn(r),
     })),
     ...payments.map((p) => ({
       kind: "billPayment" as const, id: p.id, date: p.date, amount: Number(p.amount), direction: "OUT" as const,
       ref: p.bill.invoiceNo, label: p.bill.supplier.name, bankRef: p.bankRef, chequeNo: p.bankRef,
-      href: `/bills/${p.billId}`,
+      href: `/bills/${p.billId}`, voidedOn: null,
     })),
     ...cash.map((c) => ({
       kind: "cashEntry" as const, id: c.id, date: c.date, amount: Number(c.amount), direction: c.direction,
       ref: c.refNo, label: c.counterparty ? `${c.counterparty} — ${c.description}` : c.description,
-      bankRef: c.bankRef, chequeNo: c.chequeNo, href: `/cash-book/${c.id}`,
+      bankRef: c.bankRef, chequeNo: c.chequeNo, href: `/cash-book/${c.id}`, voidedOn: voidedOn(c),
     })),
   ].map((i) => ({ ...i, line: lineFor.get(`${i.kind}:${i.id}`) ?? null }));
   return items;
@@ -171,6 +184,26 @@ export async function unmatchLine(lineId: string) {
     await setCleared(line.matchKind as MatchKind, line.matchId, null);
   }
   await db.bankStatementLine.update({ where: { id: lineId }, data: { matchKind: null, matchId: null, note: null } });
+}
+
+/**
+ * Called before a book entry is voided: if a statement line is paired with it,
+ * the pairing is released so the line shows as unmatched again. Refused when
+ * that statement has been signed off — a reconciled month must not change
+ * under the accountant's feet.
+ */
+export async function releaseLineFor(kind: MatchKind, itemId: string) {
+  const line = await db.bankStatementLine.findFirst({
+    where: { matchKind: kind, matchId: itemId },
+    include: { statement: true },
+  });
+  if (!line) return;
+  if (line.statement.reconciledAt) {
+    throw new Error(
+      `This entry is on the reconciled bank statement to ${iso(line.statement.periodTo)} (line ${line.ref}). Reopen that statement before voiding it.`,
+    );
+  }
+  await db.bankStatementLine.update({ where: { id: line.id }, data: { matchKind: null, matchId: null, note: null } });
 }
 
 /** For a line with no book entry of its own, e.g. a bounced cheque presented again. */
@@ -238,7 +271,7 @@ export async function reconciliation(statementId: string) {
   const bank = await controlAccount("BANK", statement.associationId);
 
   const [items, bankLines, gl] = await Promise.all([
-    bookItems(statement.associationId),
+    bookItems(statement.associationId, { includeVoided: true }),
     db.bankStatementLine.findMany({
       where: {
         date: { lte: asAt },
@@ -254,7 +287,10 @@ export async function reconciliation(statementId: string) {
     }),
   ]);
 
-  const outstanding = items.filter((i) => i.date <= asAt && (!i.line || i.line.date > asAt));
+  // In the books at the date (posted by then, not yet reversed) and not through the bank by then.
+  const outstanding = items.filter(
+    (i) => i.date <= asAt && !(i.voidedOn && i.voidedOn <= asAt) && (!i.line || i.line.date > asAt),
+  );
   const depositsInTransit = outstanding.filter((i) => i.direction === "IN");
   const unpresented = outstanding.filter((i) => i.direction === "OUT");
   const unmatched = bankLines.filter((l) => l.matchKind === null);
@@ -295,7 +331,16 @@ export async function markReconciled(statementId: string, by: string | null) {
         : `Bank and book differ by RM ${rec.difference.toFixed(2)}.`,
     );
   }
-  await db.bankStatement.update({ where: { id: statementId }, data: { reconciledAt: new Date(), reconciledBy: by } });
+  const statement = await db.bankStatement.findUniqueOrThrow({ where: { id: statementId } });
+  const assoc = await db.association.findUniqueOrThrow({ where: { id: statement.associationId }, select: { lockedThrough: true } });
+  await db.$transaction([
+    db.bankStatement.update({ where: { id: statementId }, data: { reconciledAt: new Date(), reconciledBy: by } }),
+    // A reconciled month is closed for posting: nothing can be entered or
+    // backdated into it from any screen until the statement is reopened.
+    ...(!assoc.lockedThrough || assoc.lockedThrough < statement.periodTo
+      ? [db.association.update({ where: { id: statement.associationId }, data: { lockedThrough: statement.periodTo } })]
+      : []),
+  ]);
 }
 
 export async function reopenStatement(statementId: string) {
@@ -310,7 +355,15 @@ export async function reopenStatement(statementId: string) {
     orderBy: { periodFrom: "asc" },
   });
   if (later) throw new Error(`Reopen the later statement (${iso(later.periodFrom)}) first — it was reconciled on top of this one.`);
-  await db.bankStatement.update({ where: { id: statementId }, data: { reconciledAt: null, reconciledBy: null } });
+  const assoc = await db.association.findUniqueOrThrow({ where: { id: statement.associationId }, select: { lockedThrough: true } });
+  const dayBefore = new Date(statement.periodFrom.getTime() - 86_400_000);
+  await db.$transaction([
+    db.bankStatement.update({ where: { id: statementId }, data: { reconciledAt: null, reconciledBy: null } }),
+    // Open the month for posting again by pulling the lock back to the day before it.
+    ...(assoc.lockedThrough && assoc.lockedThrough >= statement.periodFrom
+      ? [db.association.update({ where: { id: statement.associationId }, data: { lockedThrough: dayBefore } })]
+      : []),
+  ]);
 }
 
 /** Removes an uploaded statement, releasing any book items paired with its lines. */

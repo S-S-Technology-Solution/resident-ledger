@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { bulkGenerate } from "./actions";
+import { unwrap } from "@/lib/action";
 
 export function BulkGenerateButton() {
   const [open, setOpen] = useState(false);
@@ -44,7 +45,7 @@ export function BulkGenerateButton() {
             disabled={pending}
             onClick={() => start(async () => {
               try {
-                const { created, skipped } = await bulkGenerate({ periodMonth: month, periodYear: year, date });
+                const { created, skipped } = await unwrap(bulkGenerate({ periodMonth: month, periodYear: year, date }));
                 toast.success(`Created ${created}, skipped ${skipped}`);
                 setOpen(false);
               } catch (e) {

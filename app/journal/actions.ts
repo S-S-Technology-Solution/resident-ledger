@@ -9,6 +9,7 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { linesBalance, prepareEntry } from "@/lib/journal";
 import { assertPeriodOpen } from "@/lib/periods";
 import { requirePosting } from "@/lib/permissions";
+import { attempt } from "@/lib/action-server";
 
 const lineSchema = z.object({
   accountId: z.string().min(1),
@@ -47,108 +48,114 @@ function validateLines(lines: z.infer<typeof lineSchema>[]) {
 }
 
 export async function saveDraft(input: EntryInput) {
-  await requirePosting();
-  const data = entrySchema.parse(input);
-  const cleaned = validateLines(data.lines);
+  return attempt(async () => {
+    await requirePosting();
+    const data = entrySchema.parse(input);
+    const cleaned = validateLines(data.lines);
 
-  if (data.id) {
-    const existing = await db.journalEntry.findUnique({ where: { id: data.id } });
-    if (!existing) throw new Error("Entry not found");
-    if (existing.status !== "DRAFT") throw new Error("Only draft entries can be edited");
-    await assertPeriodOpen(new Date(data.date));
-    await db.$transaction([
-      db.journalLine.deleteMany({ where: { entryId: data.id } }),
-      db.journalEntry.update({
-        where: { id: data.id },
-        data: {
-          date: new Date(data.date),
-          description: data.description,
-          reference: data.reference,
-          lines: {
-            create: cleaned.map((l, i) => ({ ...l, lineNo: i + 1 })),
+    if (data.id) {
+      const existing = await db.journalEntry.findUnique({ where: { id: data.id } });
+      if (!existing) throw new Error("Entry not found");
+      if (existing.status !== "DRAFT") throw new Error("Only draft entries can be edited");
+      await assertPeriodOpen(new Date(data.date));
+      await db.$transaction([
+        db.journalLine.deleteMany({ where: { entryId: data.id } }),
+        db.journalEntry.update({
+          where: { id: data.id },
+          data: {
+            date: new Date(data.date),
+            description: data.description,
+            reference: data.reference,
+            lines: {
+              create: cleaned.map((l, i) => ({ ...l, lineNo: i + 1 })),
+            },
           },
-        },
-      }),
-    ]);
-    revalidatePath("/journal");
-    revalidatePath(`/journal/${data.id}`);
-    return { id: data.id };
-  }
+        }),
+      ]);
+      revalidatePath("/journal");
+      revalidatePath(`/journal/${data.id}`);
+      return { id: data.id };
+    }
 
-  const { entryNo, batchId } = await prepareEntry(new Date(data.date), "manual");
-  const created = await db.journalEntry.create({
-    data: {
-      associationId: DEFAULT_ASSOCIATION_ID,
-      entryNo,
-      batchId,
-      date: new Date(data.date),
-      description: data.description,
-      reference: data.reference,
-      status: "DRAFT",
-      lines: { create: cleaned.map((l, i) => ({ ...l, lineNo: i + 1 })) },
-    },
+    const { entryNo, batchId } = await prepareEntry(new Date(data.date), "manual");
+    const created = await db.journalEntry.create({
+      data: {
+        associationId: DEFAULT_ASSOCIATION_ID,
+        entryNo,
+        batchId,
+        date: new Date(data.date),
+        description: data.description,
+        reference: data.reference,
+        status: "DRAFT",
+        lines: { create: cleaned.map((l, i) => ({ ...l, lineNo: i + 1 })) },
+      },
+    });
+    revalidatePath("/journal");
+    return { id: created.id };
   });
-  revalidatePath("/journal");
-  return { id: created.id };
 }
 
 export async function postEntry(id: string) {
-  await requirePosting();
-  const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
-  if (!entry) throw new Error("Not found");
-  if (entry.status !== "DRAFT") throw new Error("Only drafts can be posted");
-  await assertPeriodOpen(entry.date);
-  validateLines(entry.lines.map((l) => ({
-    accountId: l.accountId,
-    debit: l.debit.toString(),
-    credit: l.credit.toString(),
-    memo: l.memo ?? undefined,
-  })));
-  await db.journalEntry.update({
-    where: { id },
-    data: { status: "POSTED", postedAt: new Date() },
+  return attempt(async () => {
+    await requirePosting();
+    const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
+    if (!entry) throw new Error("Not found");
+    if (entry.status !== "DRAFT") throw new Error("Only drafts can be posted");
+    await assertPeriodOpen(entry.date);
+    validateLines(entry.lines.map((l) => ({
+      accountId: l.accountId,
+      debit: l.debit.toString(),
+      credit: l.credit.toString(),
+      memo: l.memo ?? undefined,
+    })));
+    await db.journalEntry.update({
+      where: { id },
+      data: { status: "POSTED", postedAt: new Date() },
+    });
+    revalidatePath("/journal");
+    revalidatePath(`/journal/${id}`);
   });
-  revalidatePath("/journal");
-  revalidatePath(`/journal/${id}`);
 }
 
 export async function voidEntry(id: string, reason: string) {
-  await requirePosting();
-  const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
-  if (!entry) throw new Error("Not found");
-  if (entry.status !== "POSTED") throw new Error("Only posted entries can be voided");
-  const rev = await prepareEntry(new Date(), "reversal");
-  await db.$transaction(async (tx) => {
-    await tx.journalEntry.create({
-      data: {
-        associationId: entry.associationId,
-        entryNo: rev.entryNo,
-        batchId: rev.batchId,
-        date: new Date(),
-        description: `Reversal of ${entry.entryNo}: ${reason}`,
-        reference: entry.reference,
-        status: "POSTED",
-        postedAt: new Date(),
-        source: "reversal",
-        reversesId: entry.id,
-        lines: {
-          create: entry.lines.map((l, i) => ({
-            accountId: l.accountId,
-            debit: l.credit,
-            credit: l.debit,
-            memo: l.memo,
-            lineNo: i + 1,
-          })),
+  return attempt(async () => {
+    await requirePosting();
+    const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
+    if (!entry) throw new Error("Not found");
+    if (entry.status !== "POSTED") throw new Error("Only posted entries can be voided");
+    const rev = await prepareEntry(new Date(), "reversal");
+    await db.$transaction(async (tx) => {
+      await tx.journalEntry.create({
+        data: {
+          associationId: entry.associationId,
+          entryNo: rev.entryNo,
+          batchId: rev.batchId,
+          date: new Date(),
+          description: `Reversal of ${entry.entryNo}: ${reason}`,
+          reference: entry.reference,
+          status: "POSTED",
+          postedAt: new Date(),
+          source: "reversal",
+          reversesId: entry.id,
+          lines: {
+            create: entry.lines.map((l, i) => ({
+              accountId: l.accountId,
+              debit: l.credit,
+              credit: l.debit,
+              memo: l.memo,
+              lineNo: i + 1,
+            })),
+          },
         },
-      },
+      });
+      await tx.journalEntry.update({
+        where: { id },
+        data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason },
+      });
     });
-    await tx.journalEntry.update({
-      where: { id },
-      data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason },
-    });
+    revalidatePath("/journal");
+    revalidatePath(`/journal/${id}`);
   });
-  revalidatePath("/journal");
-  revalidatePath(`/journal/${id}`);
 }
 
 export async function createDraftAndEdit() {

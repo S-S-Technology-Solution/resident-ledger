@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { voidCharge } from "./actions";
+import { unwrap } from "@/lib/action";
 
 export function VoidChargeButton({ id, size = "sm" }: { id: string; size?: "sm" | "default" }) {
   const [open, setOpen] = useState(false);
@@ -34,7 +35,7 @@ export function VoidChargeButton({ id, size = "sm" }: { id: string; size?: "sm" 
             disabled={pending || !reason}
             onClick={() => start(async () => {
               try {
-                await voidCharge(id, reason);
+                await unwrap(voidCharge(id, reason));
                 toast.success("Voided");
                 setOpen(false);
               } catch (e) {

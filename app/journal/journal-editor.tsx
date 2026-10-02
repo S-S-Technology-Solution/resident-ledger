@@ -12,6 +12,7 @@ import Decimal from "decimal.js";
 import { Trash2 } from "lucide-react";
 import { fmtRM } from "@/lib/money";
 import { saveDraft, postEntry } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type AccountOpt = { id: string; code: string; name: string };
 
@@ -57,15 +58,15 @@ export function JournalEditor({
   async function doSave(thenPost = false) {
     start(async () => {
       try {
-        const { id } = await saveDraft({
+        const { id } = await unwrap(saveDraft({
           id: initial?.id,
           date,
           description,
           reference: reference || undefined,
           lines: lines.map((l) => ({ accountId: l.accountId, debit: l.debit || "0", credit: l.credit || "0", memo: l.memo || undefined })),
-        });
+        }));
         if (thenPost) {
-          await postEntry(id);
+          await unwrap(postEntry(id));
           toast.success("Entry posted");
         } else {
           toast.success("Draft saved");

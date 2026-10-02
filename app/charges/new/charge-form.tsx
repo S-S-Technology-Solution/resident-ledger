@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { toast } from "sonner";
 import { createCharge } from "../actions";
+import { unwrap } from "@/lib/action";
 
 type ResidentOpt = { id: string; unitAddress: string; ownerName: string; monthlyFee: string };
 
@@ -74,7 +75,7 @@ export function ChargeForm({ residents, defaultResidentId }: { residents: Reside
           disabled={pending || !residentId || !amount || !description}
           onClick={() => start(async () => {
             try {
-              await createCharge({ residentId, date, periodMonth, periodYear, amount, description });
+              await unwrap(createCharge({ residentId, date, periodMonth, periodYear, amount, description }));
               toast.success("Charge created");
               router.push(`/residents/${residentId}`);
             } catch (e) {

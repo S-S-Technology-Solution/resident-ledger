@@ -38,7 +38,7 @@ export function StatementActions({
       <ConfirmButton
         label="Reopen"
         title="Reopen this statement?"
-        description="Its lines can then be changed again. Sign it off once more when it agrees."
+        description="Its lines can be changed again and the lock date moves back so the month is open for posting. Sign it off once more when it agrees."
         confirmLabel="Reopen"
         onConfirm={() => orThrow(reopenBankStatement(statementId))}
       />
@@ -64,7 +64,7 @@ export function StatementActions({
         variant="default"
         title="Sign off this reconciliation?"
         description={canSignOff
-          ? "Bank and book agree. The statement's lines will be frozen until it is reopened."
+          ? "Bank and book agree. The statement's lines are frozen and the month is locked for posting (Settings › lock date) until it is reopened."
           : "It can't be signed off yet — every line must be matched and bank and book must agree."}
         confirmLabel="Sign off"
         onConfirm={() => orThrow(signOffStatement(statementId))}

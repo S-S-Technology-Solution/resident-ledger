@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DataCard } from "@/components/data-card";
 import { toast } from "sonner";
 import { importCsv, type ImportKind, type ImportResult } from "./actions";
+import { unwrap } from "@/lib/action";
 
 const KINDS: { key: ImportKind; label: string; columns: string; note: string }[] = [
   {
@@ -51,7 +52,7 @@ export function ImportForm({ readOnly }: { readOnly: boolean }) {
   function run(apply: boolean) {
     start(async () => {
       try {
-        const res = await importCsv(kind, text, apply);
+        const res = await unwrap(importCsv(kind, text, apply));
         setResult(res);
         if (apply) toast.success(`Imported ${res.ok} row${res.ok === 1 ? "" : "s"}`);
         else toast.success(`Checked ${res.rows.length} row${res.rows.length === 1 ? "" : "s"} — nothing saved yet`);

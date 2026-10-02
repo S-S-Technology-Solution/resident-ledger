@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { generate, setBatchLocked, deleteBatch } from "./actions";
+import { unwrap } from "@/lib/action";
 
 const GROUPS = [
   { key: "SALES", label: "Sales" },
@@ -44,11 +45,11 @@ export function GenerateBatchDialog({ defaultYear }: { defaultYear: number }) {
   function submit() {
     start(async () => {
       try {
-        const res = await generate({
+        const res = await unwrap(generate({
           groups,
           fromYear: Number(fromYear), fromMonth: Number(fromMonth),
           toYear: Number(toYear), toMonth: Number(toMonth),
-        });
+        }));
         toast.success(
           res.created === 0
             ? "Those batches already exist"
@@ -156,7 +157,7 @@ export function LockBatchButton({ id, locked }: { id: string; locked: boolean })
       onClick={() =>
         start(async () => {
           try {
-            await setBatchLocked(id, !locked);
+            await unwrap(setBatchLocked(id, !locked));
             toast.success(locked ? "Batch unlocked" : "Batch locked");
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Failed");
@@ -179,7 +180,7 @@ export function DeleteBatchButton({ id }: { id: string }) {
       onClick={() =>
         start(async () => {
           try {
-            await deleteBatch(id);
+            await unwrap(deleteBatch(id));
             toast.success("Batch deleted");
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Failed");

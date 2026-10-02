@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { upsertSupplier } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type Supplier = { id: string; name: string; creditorCode?: string; contact?: string; phone?: string; bankAccount?: string };
 
@@ -39,7 +40,7 @@ export function SupplierDialog({ mode, supplier }: { mode: "create" | "edit"; su
             disabled={pending || !name}
             onClick={() => start(async () => {
               try {
-                await upsertSupplier({ id: supplier?.id, name, creditorCode, contact, phone, bankAccount });
+                await unwrap(upsertSupplier({ id: supplier?.id, name, creditorCode, contact, phone, bankAccount }));
                 toast.success("Saved");
                 setOpen(false);
               } catch (e) {

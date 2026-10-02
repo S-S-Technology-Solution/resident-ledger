@@ -10,6 +10,7 @@ import { DataCard } from "@/components/data-card";
 import { toast } from "sonner";
 import { fmtRM } from "@/lib/money";
 import { saveGLOpeningBalances } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type Row = {
   accountId: string;
@@ -45,14 +46,14 @@ export function GLOpeningForm({ initial, openingDate }: { initial: Row[]; openin
   function submit() {
     start(async () => {
       try {
-        const res = await saveGLOpeningBalances({
+        const res = await unwrap(saveGLOpeningBalances({
           date,
           rows: rows.map((r) => ({
             accountId: r.accountId,
             debit: r.debit || "0",
             credit: r.credit || "0",
           })),
-        });
+        }));
         toast.success(`Opening balances saved — ${res.lines} accounts, ${fmtRM(res.totalDr)} each side`);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to save");

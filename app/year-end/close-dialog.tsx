@@ -11,8 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { fmtRM } from "@/lib/money";
 import { previewClosing, runYearEndClosing, undoYearEndClosing } from "./actions";
+import { unwrap } from "@/lib/action";
 
-type Preview = Awaited<ReturnType<typeof previewClosing>>;
+type Preview = Extract<Awaited<ReturnType<typeof previewClosing>>, { ok: true }>["data"];
 
 export function CloseYearDialog({ year }: { year: number }) {
   const [open, setOpen] = useState(false);
@@ -25,7 +26,7 @@ export function CloseYearDialog({ year }: { year: number }) {
     if (!next) { setPreview(null); setConfirm(""); return; }
     start(async () => {
       try {
-        setPreview(await previewClosing(year));
+        setPreview(await unwrap(previewClosing(year)));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not read the year");
         setOpen(false);
@@ -36,7 +37,7 @@ export function CloseYearDialog({ year }: { year: number }) {
   function submit() {
     start(async () => {
       try {
-        const res = await runYearEndClosing(year);
+        const res = await unwrap(runYearEndClosing(year));
         toast.success(`${year} closed — ${res.entryNo}, surplus ${fmtRM(res.surplus)}`);
         setOpen(false);
       } catch (e) {
@@ -140,7 +141,7 @@ export function ReopenYearButton({ year }: { year: number }) {
       onClick={() =>
         start(async () => {
           try {
-            await undoYearEndClosing(year);
+            await unwrap(undoYearEndClosing(year));
             toast.success(`${year} reopened`);
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Could not reopen");

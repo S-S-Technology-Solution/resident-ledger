@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { toast } from "sonner";
 import { createBill } from "../actions";
+import { unwrap } from "@/lib/action";
 
 export function BillForm({
   suppliers,
@@ -74,10 +75,10 @@ export function BillForm({
           disabled={pending || !supplierId || !invoiceNo || !amount || !expenseAccountId}
           onClick={() => start(async () => {
             try {
-              const b = await createBill({
+              const b = await unwrap(createBill({
                 supplierId, invoiceNo, date, dueDate: dueDate || undefined,
                 amount, expenseAccountId, description: description || undefined,
-              });
+              }));
               toast.success("Bill recorded");
               router.push(`/bills/${b.id}`);
             } catch (e) {

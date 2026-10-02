@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { upsertAccount } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type Account = {
   id: string;
@@ -49,11 +50,11 @@ export function AccountDialog({ mode, account }: { mode: "create" | "edit"; acco
   function submit() {
     start(async () => {
       try {
-        await upsertAccount({
+        await unwrap(upsertAccount({
           id: account?.id, code, name, type,
           normalSide: TYPE_TO_NORMAL[type],
           group, classifiedAs: classifiedAs || null,
-        });
+        }));
         toast.success(mode === "create" ? "Account created" : "Account updated");
         setOpen(false);
       } catch (e) {

@@ -124,14 +124,14 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
                 <TableRow key={l.id} className={done ? "bg-emerald-50/40" : ""}>
                   <TableCell className="font-mono text-xs align-top">{l.ref}</TableCell>
                   <TableCell className="text-sm align-top whitespace-nowrap">{format(l.date, "d MMM")}</TableCell>
-                  <TableCell className="text-sm align-top">
-                    <div className="font-medium">{l.type}{l.serial ? <span className="ml-2 font-mono text-xs text-muted-foreground">{l.serial}</span> : null}</div>
+                  <TableCell className="text-sm align-top whitespace-normal min-w-[18rem]">
+                    <div className="font-medium whitespace-nowrap">{l.type}{l.serial ? <span className="ml-2 font-mono text-xs text-muted-foreground">{l.serial}</span> : null}</div>
                     {l.details && <div className="text-xs text-muted-foreground">{l.details}</div>}
                   </TableCell>
                   <TableCell className="text-right font-mono tabular align-top text-rose-700">{l.debit ? fmtRM(l.debit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular align-top text-emerald-700">{l.credit ? fmtRM(l.credit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular align-top">{fmtRM(l.balance)}</TableCell>
-                  <TableCell className="align-top">
+                  <TableCell className="align-top whitespace-normal">
                     <LineActions
                       line={l}
                       residents={residentOptions}
@@ -194,17 +194,21 @@ function ReconciliationStatement({ rec }: { rec: Rec }) {
       <div className="mb-2 flex items-center justify-between">
         <h2 className="font-semibold">Bank reconciliation as at {format(rec.asAt, "d MMMM yyyy")}</h2>
         <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${agrees && !rec.unmatched.length ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-          {agrees && !rec.unmatched.length ? "Agrees" : rec.unmatched.length ? `${rec.unmatched.length} line(s) to match` : "Does not agree"}
+          {agrees && !rec.unmatched.length
+            ? "Agrees"
+            : rec.unmatched.length
+              ? `${rec.unmatched.length} line${rec.unmatched.length === 1 ? "" : "s"} to match up to this date`
+              : "Does not agree"}
         </span>
       </div>
       <Row label="Balance as per bank statement" value={rec.bankBalance.toNumber()} />
       <Row label="Add: deposits in the books, not yet credited by the bank" value={itemSum(rec.depositsInTransit)} sub={<List rows={itemRows(rec.depositsInTransit)} />} />
       <Row label="Less: payments in the books, not yet presented" value={0 - itemSum(rec.unpresented) || 0} sub={<List rows={itemRows(rec.unpresented)} />} />
       {rec.noEntry.length > 0 && (
-        <Row label="Less: bank items with no book entry (net)" value={0 - lineNet(rec.noEntry).toNumber() || 0} sub={<List rows={bankLineRows(rec.noEntry)} />} />
+        <Row label="Bank items with no book entry (net)" value={0 - lineNet(rec.noEntry).toNumber() || 0} sub={<List rows={bankLineRows(rec.noEntry)} />} />
       )}
       {rec.unmatched.length > 0 && (
-        <Row label="Less: statement lines not yet matched (net)" value={0 - lineNet(rec.unmatched).toNumber() || 0} sub={<List rows={bankLineRows(rec.unmatched)} />} />
+        <Row label="Statement lines not yet matched, this and earlier months (net)" value={0 - lineNet(rec.unmatched).toNumber() || 0} sub={<List rows={bankLineRows(rec.unmatched)} />} />
       )}
       <Row label="Adjusted bank balance" value={rec.adjusted.toNumber()} strong />
       <Row label="Balance as per cash book" value={rec.bookBalance.toNumber()} />

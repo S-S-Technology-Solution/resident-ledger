@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { fmtRM } from "@/lib/money";
 import { createReceipt } from "../actions";
 import { fetchOutstanding } from "./outstanding-action";
+import { unwrap } from "@/lib/action";
 
 type ResidentOpt = { id: string; unitAddress: string; ownerName: string };
 type Charge = { id: string; description: string; periodMonth: number; periodYear: number; open: string };
@@ -39,7 +40,7 @@ export function ReceiptForm({
 
   useEffect(() => {
     if (!residentId) { setOpen([]); return; }
-    fetchOutstanding(residentId).then(setOpen);
+    unwrap(fetchOutstanding(residentId)).then(setOpen);
   }, [residentId]);
 
   const totalOutstanding = useMemo(
@@ -157,7 +158,7 @@ export function ReceiptForm({
               const allocations = Object.entries(allocs)
                 .filter(([, v]) => new Decimal(v || 0).gt(0))
                 .map(([chargeId, v]) => ({ chargeId, amount: v }));
-              const r = await createReceipt({ residentId, date, amount, method, bankRef: bankRef || undefined, allocations });
+              const r = await unwrap(createReceipt({ residentId, date, amount, method, bankRef: bankRef || undefined, allocations }));
               toast.success(`Receipt ${r.receiptNo} created`);
               router.push(`/receipts/${r.id}?print=1`);
             } catch (e) {

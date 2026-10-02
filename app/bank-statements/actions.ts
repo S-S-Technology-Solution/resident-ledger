@@ -13,7 +13,7 @@ import {
   autoMatch, deleteStatement, markNoEntry, markReconciled, matchLine, reopenStatement, saveStatement, unmatchLine,
   type MatchKind,
 } from "@/lib/bank-statement/service";
-import { createReceipt } from "@/app/receipts/actions";
+import { postReceipt } from "@/lib/receipt-posting";
 
 // Expected failures come back as values so the reason reaches the screen in
 // production, where thrown messages are replaced with a generic one.
@@ -22,7 +22,7 @@ type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string
 async function run<T>(fn: () => Promise<T>, paths: string[] = []): Promise<Result<T>> {
   try {
     const data = await fn();
-    for (const p of ["/bank-statements", "/reconciliation", ...paths]) revalidatePath(p);
+    for (const p of ["/bank-statements", "/settings", ...paths]) revalidatePath(p);
     return { ok: true, data };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
@@ -88,7 +88,7 @@ export async function receiptFromLine(input: z.infer<typeof receiptSchema>) {
     const line = await db.bankStatementLine.findUniqueOrThrow({ where: { id: data.lineId } });
     if (line.matchKind) throw new Error(`Line ${line.ref} is already matched.`);
     if (Number(line.credit) <= 0) throw new Error("Only money in can become a resident receipt.");
-    const receipt = await createReceipt({
+    const receipt = await postReceipt({
       residentId: data.residentId,
       date: line.date.toISOString().slice(0, 10),
       amount: line.credit.toString(),
@@ -97,6 +97,7 @@ export async function receiptFromLine(input: z.infer<typeof receiptSchema>) {
       allocations: [],
     });
     await matchLine(line.id, "receipt", receipt.id);
+    revalidatePath(`/residents/${data.residentId}`);
     return receipt;
   }, ["/receipts"]);
 }

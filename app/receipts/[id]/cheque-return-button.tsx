@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { returnCheque } from "../actions";
+import { unwrap } from "@/lib/action";
 
 export function ChequeReturnButton({ id, receiptNo }: { id: string; receiptNo: string }) {
   const router = useRouter();
@@ -76,7 +77,7 @@ export function ChequeReturnButton({ id, receiptNo }: { id: string; receiptNo: s
             onClick={() =>
               start(async () => {
                 try {
-                  await returnCheque({ receiptId: id, date, reason, bankCharge: bankCharge || undefined });
+                  await unwrap(returnCheque({ receiptId: id, date, reason, bankCharge: bankCharge || undefined }));
                   toast.success(`${receiptNo} reversed as a returned cheque`);
                   setOpen(false);
                   router.refresh();

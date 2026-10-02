@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { payBill } from "../actions";
+import { unwrap } from "@/lib/action";
 
 export function PayBillButton({ billId, open }: { billId: string; open: string }) {
   const [openDlg, setOpenDlg] = useState(false);
@@ -48,7 +49,7 @@ export function PayBillButton({ billId, open }: { billId: string; open: string }
             disabled={pending || !amount}
             onClick={() => start(async () => {
               try {
-                await payBill({ billId, date, amount, method, bankRef: bankRef || undefined });
+                await unwrap(payBill({ billId, date, amount, method, bankRef: bankRef || undefined }));
                 toast.success("Payment recorded");
                 setOpenDlg(false);
               } catch (e) {

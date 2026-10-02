@@ -58,10 +58,10 @@ export default async function CashBookPage() {
               <TableHead className="w-28">Date</TableHead>
               <TableHead className="w-28">Ref</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead className="w-52">Account</TableHead>
-              <TableHead className="w-24">Method</TableHead>
-              <TableHead className="w-32 text-right">In</TableHead>
-              <TableHead className="w-32 text-right">Out</TableHead>
+              <TableHead className="w-48">Account</TableHead>
+              <TableHead className="w-20">Method</TableHead>
+              <TableHead className="w-28 text-right">In</TableHead>
+              <TableHead className="w-28 text-right">Out</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -71,15 +71,16 @@ export default async function CashBookPage() {
                 <TableCell className="font-mono">
                   <Link href={`/cash-book/${e.id}`} className="hover:underline">{e.refNo}</Link>
                 </TableCell>
-                <TableCell>
-                  {e.description}
-                  {e.counterparty && (
-                    <span className="text-muted-foreground"> · {e.counterparty}</span>
-                  )}
-                  {e.voided && <Badge variant="outline" className="ml-2">Voided</Badge>}
+                <TableCell className="whitespace-normal">
+                  <div>
+                    {e.description}
+                    {e.voided && <Badge variant="outline" className="ml-2">Voided</Badge>}
+                  </div>
+                  {e.counterparty && <div className="text-xs text-muted-foreground">{e.counterparty}</div>}
                 </TableCell>
-                <TableCell className="text-muted-foreground">
-                  <span className="font-mono">{e.account.code}</span> {e.account.name}
+                <TableCell className="whitespace-normal text-muted-foreground">
+                  <div className="font-mono text-xs">{e.account.code}</div>
+                  <div className="text-xs">{e.account.name}</div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{e.method}</TableCell>
                 <TableCell className="text-right font-mono tabular">

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { requirePosting } from "@/lib/permissions";
+import { attempt } from "@/lib/action-server";
 
 const schema = z.object({
   id: z.string().optional(),
@@ -18,29 +19,33 @@ const schema = z.object({
 export type SupplierInput = z.infer<typeof schema>;
 
 export async function upsertSupplier(input: SupplierInput) {
-  await requirePosting();
-  const data = schema.parse(input);
-  if (data.id) {
-    await db.supplier.update({
-      where: { id: data.id },
-      data: {
-        name: data.name, contact: data.contact, phone: data.phone,
-        bankAccount: data.bankAccount, creditorCode: data.creditorCode || null,
-      },
-    });
-  } else {
-    await db.supplier.create({
-      data: {
-        associationId: DEFAULT_ASSOCIATION_ID, ...data,
-        creditorCode: data.creditorCode || null,
-      },
-    });
-  }
-  revalidatePath("/suppliers");
+  return attempt(async () => {
+    await requirePosting();
+    const data = schema.parse(input);
+    if (data.id) {
+      await db.supplier.update({
+        where: { id: data.id },
+        data: {
+          name: data.name, contact: data.contact, phone: data.phone,
+          bankAccount: data.bankAccount, creditorCode: data.creditorCode || null,
+        },
+      });
+    } else {
+      await db.supplier.create({
+        data: {
+          associationId: DEFAULT_ASSOCIATION_ID, ...data,
+          creditorCode: data.creditorCode || null,
+        },
+      });
+    }
+    revalidatePath("/suppliers");
+  });
 }
 
 export async function toggleSupplier(id: string, active: boolean) {
-  await requirePosting();
-  await db.supplier.update({ where: { id }, data: { active } });
-  revalidatePath("/suppliers");
+  return attempt(async () => {
+    await requirePosting();
+    await db.supplier.update({ where: { id }, data: { active } });
+    revalidatePath("/suppliers");
+  });
 }

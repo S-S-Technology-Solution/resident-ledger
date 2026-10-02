@@ -3,6 +3,7 @@
 import { ConfirmButton } from "@/components/confirm-button";
 import { toast } from "sonner";
 import { deleteAccount } from "./actions";
+import { unwrap } from "@/lib/action";
 
 export function DeleteButton({ id, code }: { id: string; code: string }) {
   return (
@@ -13,7 +14,7 @@ export function DeleteButton({ id, code }: { id: string; code: string }) {
       confirmLabel="Delete"
       destructive
       onConfirm={async () => {
-        await deleteAccount(id);
+        await unwrap(deleteAccount(id));
         toast.success("Deleted");
       }}
     />

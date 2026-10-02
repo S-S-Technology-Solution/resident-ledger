@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { upsertResident } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type Resident = { id: string; unitAddress: string; ownerName: string; phone?: string; monthlyFee: string };
 
@@ -49,12 +50,12 @@ export function ResidentDialog({ mode, resident }: { mode: "create" | "edit"; re
             disabled={pending || !unitAddress || !ownerName}
             onClick={() => start(async () => {
               try {
-                await upsertResident({
+                await unwrap(upsertResident({
                   id: resident?.id,
                   unitAddress, ownerName,
                   phone: phone || undefined,
                   monthlyFee: monthlyFee || "0",
-                });
+                }));
                 toast.success("Saved");
                 setOpen(false);
               } catch (e) {

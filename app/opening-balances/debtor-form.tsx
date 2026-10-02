@@ -9,6 +9,7 @@ import { DataCard } from "@/components/data-card";
 import { toast } from "sonner";
 import { fmtRM } from "@/lib/money";
 import { saveDebtorOpeningBalances, saveCreditorOpeningBalances } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type Row = {
   id: string;
@@ -61,16 +62,16 @@ export function SubsidiaryOpeningForm({
     start(async () => {
       try {
         if (kind === "debtor") {
-          const res = await saveDebtorOpeningBalances({
+          const res = await unwrap(saveDebtorOpeningBalances({
             rows: rows.map((r) => ({ residentId: r.id, amount: r.amount || "0" })),
-          });
+          }));
           toast.success(
             `Saved — ${res.owing} owing, ${res.advance} in advance, ${res.cleared} with nothing brought forward`,
           );
         } else {
-          const res = await saveCreditorOpeningBalances({
+          const res = await unwrap(saveCreditorOpeningBalances({
             rows: rows.map((r) => ({ supplierId: r.id, amount: r.amount || "0" })),
-          });
+          }));
           toast.success(`Saved — ${res.saved} with a balance, ${res.cleared} cleared`);
         }
       } catch (e) {

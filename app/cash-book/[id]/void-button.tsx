@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { voidEntry } from "../actions";
+import { unwrap } from "@/lib/action";
 
 export function VoidCashEntryButton({ id, refNo }: { id: string; refNo: string }) {
   const router = useRouter();
@@ -47,7 +48,7 @@ export function VoidCashEntryButton({ id, refNo }: { id: string; refNo: string }
             onClick={() =>
               start(async () => {
                 try {
-                  await voidEntry(id, reason);
+                  await unwrap(voidEntry(id, reason));
                   toast.success(`${refNo} voided`);
                   setOpen(false);
                   router.refresh();

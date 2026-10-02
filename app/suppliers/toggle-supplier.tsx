@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { toast } from "sonner";
 import { toggleSupplier } from "./actions";
+import { unwrap } from "@/lib/action";
 
 export function ToggleSupplier({ id, active }: { id: string; active: boolean }) {
   const [pending, start] = useTransition();
@@ -17,7 +18,7 @@ export function ToggleSupplier({ id, active }: { id: string; active: boolean }) 
         confirmLabel="Deactivate"
         destructive
         onConfirm={async () => {
-          await toggleSupplier(id, false);
+          await unwrap(toggleSupplier(id, false));
           toast.success("Deactivated");
         }}
       />
@@ -29,7 +30,7 @@ export function ToggleSupplier({ id, active }: { id: string; active: boolean }) 
       variant="outline"
       disabled={pending}
       onClick={() => start(async () => {
-        try { await toggleSupplier(id, true); toast.success("Activated"); }
+        try { await unwrap(toggleSupplier(id, true)); toast.success("Activated"); }
         catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
       })}
     >Activate</Button>

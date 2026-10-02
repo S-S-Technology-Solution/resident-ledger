@@ -5,6 +5,7 @@ import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { prepareEntry } from "./journal";
 import { paymentMethodAccount } from "./control-accounts";
 import { nextNumber } from "./numbering";
+import { releaseLineFor } from "./bank-statement/service";
 
 /**
  * Cash book — money in or out that has no debtor or creditor behind it. Bank
@@ -104,6 +105,7 @@ export async function voidCashEntry(id: string, reason: string) {
   const cash = await db.cashEntry.findUnique({ where: { id } });
   if (!cash) throw new Error("Not found");
   if (cash.voided) throw new Error("Already voided");
+  await releaseLineFor("cashEntry", id);
 
   const rev = await prepareEntry(new Date(), "reversal");
 

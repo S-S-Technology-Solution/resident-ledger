@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { voidBill } from "../actions";
+import { unwrap } from "@/lib/action";
 
 export function VoidBillButton({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
@@ -25,7 +26,7 @@ export function VoidBillButton({ id }: { id: string }) {
             variant="destructive"
             disabled={pending || !reason}
             onClick={() => start(async () => {
-              try { await voidBill(id, reason); toast.success("Voided"); setOpen(false); }
+              try { await unwrap(voidBill(id, reason)); toast.success("Voided"); setOpen(false); }
               catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
             })}
           >Void</Button>

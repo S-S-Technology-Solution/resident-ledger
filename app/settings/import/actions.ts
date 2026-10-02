@@ -6,6 +6,7 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { requireAdmin } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { parseCsvRecords, pick, parseMoney } from "@/lib/csv";
+import { attempt } from "@/lib/action-server";
 
 export type ImportKind = "residents" | "suppliers" | "debtorOpening" | "accounts";
 
@@ -27,30 +28,32 @@ export async function importCsv(
   kind: ImportKind,
   text: string,
   apply: boolean,
-): Promise<ImportResult> {
-  await requireAdmin();
-  const records = parseCsvRecords(text);
-  if (records.length === 0) throw new Error("No data rows found — check the file has a header row.");
+) {
+  return attempt(async () => {
+    await requireAdmin();
+    const records = parseCsvRecords(text);
+    if (records.length === 0) throw new Error("No data rows found — check the file has a header row.");
 
-  const rows: ImportRow[] =
-    kind === "residents" ? await importResidents(records, apply)
-    : kind === "suppliers" ? await importSuppliers(records, apply)
-    : kind === "debtorOpening" ? await importDebtorOpening(records, apply)
-    : await importAccounts(records, apply);
+    const rows: ImportRow[] =
+      kind === "residents" ? await importResidents(records, apply)
+      : kind === "suppliers" ? await importSuppliers(records, apply)
+      : kind === "debtorOpening" ? await importDebtorOpening(records, apply)
+      : await importAccounts(records, apply);
 
-  const problems = rows.filter((r) => r.problem).length;
+    const problems = rows.filter((r) => r.problem).length;
 
-  if (apply) {
-    await recordAudit("import", kind, "run", {
-      after: { rows: rows.length, applied: rows.length - problems, problems },
-    });
-    revalidatePath("/residents");
-    revalidatePath("/suppliers");
-    revalidatePath("/accounts");
-    revalidatePath("/opening-balances");
-  }
+    if (apply) {
+      await recordAudit("import", kind, "run", {
+        after: { rows: rows.length, applied: rows.length - problems, problems },
+      });
+      revalidatePath("/residents");
+      revalidatePath("/suppliers");
+      revalidatePath("/accounts");
+      revalidatePath("/opening-balances");
+    }
 
-  return { rows, ok: rows.length - problems, problems, applied: apply };
+    return { rows, ok: rows.length - problems, problems, applied: apply };
+  });
 }
 
 async function importResidents(records: Record<string, string>[], apply: boolean) {

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { voidReceipt } from "../actions";
+import { unwrap } from "@/lib/action";
 
 export function VoidReceiptButton({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
@@ -29,7 +30,7 @@ export function VoidReceiptButton({ id }: { id: string }) {
             disabled={pending || !reason}
             onClick={() => start(async () => {
               try {
-                await voidReceipt(id, reason);
+                await unwrap(voidReceipt(id, reason));
                 toast.success("Voided");
                 setOpen(false);
               } catch (e) {

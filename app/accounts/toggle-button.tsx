@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { toast } from "sonner";
 import { toggleAccount } from "./actions";
+import { unwrap } from "@/lib/action";
 
 export function ToggleButton({ id, active }: { id: string; active: boolean }) {
   const [pending, start] = useTransition();
@@ -17,7 +18,7 @@ export function ToggleButton({ id, active }: { id: string; active: boolean }) {
         confirmLabel="Deactivate"
         destructive
         onConfirm={async () => {
-          await toggleAccount(id, false);
+          await unwrap(toggleAccount(id, false));
           toast.success("Deactivated");
         }}
       />
@@ -29,7 +30,7 @@ export function ToggleButton({ id, active }: { id: string; active: boolean }) {
       variant="outline"
       disabled={pending}
       onClick={() => start(async () => {
-        try { await toggleAccount(id, true); toast.success("Activated"); }
+        try { await unwrap(toggleAccount(id, true)); toast.success("Activated"); }
         catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
       })}
     >Activate</Button>

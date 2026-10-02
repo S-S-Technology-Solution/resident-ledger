@@ -12,6 +12,7 @@ import { DataCard } from "@/components/data-card";
 import { toast } from "sonner";
 import { saveControlAccounts, saveSequences } from "./actions";
 import { stemFor, type SequenceReset } from "@/lib/numbering-format";
+import { unwrap } from "@/lib/action";
 
 type Account = { code: string; name: string };
 type ControlRow = { key: string; label: string; description: string; code: string };
@@ -33,7 +34,7 @@ export function ControlAccountsForm({
   function submit() {
     start(async () => {
       try {
-        await saveControlAccounts(values as Parameters<typeof saveControlAccounts>[0]);
+        await unwrap(saveControlAccounts(values as Parameters<typeof saveControlAccounts>[0]));
         toast.success("Control accounts saved");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to save");
@@ -101,11 +102,11 @@ export function SequenceForm({ rows: initial, readOnly }: { rows: SeqRow[]; read
   function submit() {
     start(async () => {
       try {
-        await saveSequences({
+        await unwrap(saveSequences({
           rows: rows.map((r) => ({
             key: r.key, prefix: r.prefix, padding: r.padding, reset: r.reset, startAt: r.startAt,
           })),
-        });
+        }));
         toast.success("Numbering saved");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to save");

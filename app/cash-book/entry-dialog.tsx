@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { createEntry } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type Account = { id: string; code: string; name: string; type: string };
 
@@ -47,13 +48,13 @@ export function CashEntryDialog({
   function submit() {
     start(async () => {
       try {
-        const res = await createEntry({
+        const res = await unwrap(createEntry({
           direction, date, amount, description, accountId,
           counterparty: counterparty || undefined,
           method,
           bankRef: bankRef || undefined,
           chequeNo: chequeNo || undefined,
-        });
+        }));
         toast.success(`${isIn ? "Receipt" : "Payment voucher"} ${res.refNo} saved`);
         setOpen(false);
         reset();

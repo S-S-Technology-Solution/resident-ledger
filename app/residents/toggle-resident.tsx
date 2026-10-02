@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { toast } from "sonner";
 import { toggleResident } from "./actions";
+import { unwrap } from "@/lib/action";
 
 export function ToggleResident({ id, active }: { id: string; active: boolean }) {
   const [pending, start] = useTransition();
@@ -17,7 +18,7 @@ export function ToggleResident({ id, active }: { id: string; active: boolean }) 
         confirmLabel="Move out"
         destructive
         onConfirm={async () => {
-          await toggleResident(id, false);
+          await unwrap(toggleResident(id, false));
           toast.success("Marked moved out");
         }}
       />
@@ -29,7 +30,7 @@ export function ToggleResident({ id, active }: { id: string; active: boolean }) 
       variant="outline"
       disabled={pending}
       onClick={() => start(async () => {
-        try { await toggleResident(id, true); toast.success("Reactivated"); }
+        try { await unwrap(toggleResident(id, true)); toast.success("Reactivated"); }
         catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
       })}
     >Reactivate</Button>

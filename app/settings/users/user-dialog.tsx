@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { upsertUser, setUserActive } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type User = { id: string; name: string; email: string; role: UserRole };
 
@@ -35,7 +36,7 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
   function submit() {
     start(async () => {
       try {
-        await upsertUser({ id: user?.id, name, email, role, password: password || "" });
+        await unwrap(upsertUser({ id: user?.id, name, email, role, password: password || "" }));
         toast.success(mode === "create" ? "User added" : "User updated");
         setOpen(false);
         setPassword("");
@@ -116,7 +117,7 @@ export function ToggleUserButton({ id, active }: { id: string; active: boolean }
       onClick={() =>
         start(async () => {
           try {
-            await setUserActive(id, !active);
+            await unwrap(setUserActive(id, !active));
             toast.success(active ? "User deactivated" : "User reactivated");
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Failed");

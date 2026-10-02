@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { saveSettings } from "./actions";
+import { unwrap } from "@/lib/action";
 
 type Initial = {
   name: string;
@@ -34,10 +35,10 @@ export function SettingsForm({ initial }: { initial: Initial }) {
   function save() {
     start(async () => {
       try {
-        await saveSettings({
+        await unwrap(saveSettings({
           name, registrationNo, address, currency,
           fiscalYearStart: fy, lockedThrough: lockedThrough || undefined,
-        });
+        }));
         toast.success("Settings saved");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed");
