@@ -8,7 +8,7 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { prepareEntry } from "@/lib/journal";
 import { recordAudit } from "@/lib/audit";
 import { requirePosting } from "@/lib/permissions";
-import { postCharge, type ChargeInput } from "@/lib/charge-posting";
+import { postCharge, postChargesBulk, type ChargeInput } from "@/lib/charge-posting";
 
 export type { ChargeInput } from "@/lib/charge-posting";
 
@@ -31,25 +31,24 @@ export async function bulkGenerate(input: z.infer<typeof bulkSchema>) {
   const data = bulkSchema.parse(input);
   const residents = await db.resident.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },
+    orderBy: { debtorCode: "asc" },
   });
-  let created = 0, skipped = 0;
-  for (const r of residents) {
-    const fee = new Decimal(r.monthlyFee.toString());
-    if (fee.lte(0)) { skipped++; continue; }
-    const existing = await db.charge.findFirst({
-      where: { residentId: r.id, periodMonth: data.periodMonth, periodYear: data.periodYear, voided: false },
-    });
-    if (existing) { skipped++; continue; }
-    await postCharge({
-      residentId: r.id,
-      date: data.date,
-      periodMonth: data.periodMonth,
-      periodYear: data.periodYear,
-      amount: fee.toFixed(2),
-      description: `Monthly fee — ${data.periodYear}-${String(data.periodMonth).padStart(2, "0")}`,
-    });
-    created++;
-  }
+  const already = new Set(
+    (await db.charge.findMany({
+      where: { associationId: DEFAULT_ASSOCIATION_ID, periodMonth: data.periodMonth, periodYear: data.periodYear, voided: false },
+      select: { residentId: true },
+    })).map((c) => c.residentId),
+  );
+  const due = residents.filter((r) => new Decimal(r.monthlyFee.toString()).gt(0) && !already.has(r.id));
+  const skipped = residents.length - due.length;
+  const created = await postChargesBulk(due.map((r) => ({
+    residentId: r.id,
+    date: data.date,
+    periodMonth: data.periodMonth,
+    periodYear: data.periodYear,
+    amount: new Decimal(r.monthlyFee.toString()).toFixed(2),
+    description: `Monthly fee — ${data.periodYear}-${String(data.periodMonth).padStart(2, "0")}`,
+  })));
   revalidatePath("/charges");
   revalidatePath("/residents");
   return { created, skipped };
