@@ -15,6 +15,8 @@ import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
 import type { Prisma } from "@prisma/client";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ export default async function BillsPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; from?: string; to?: string; page?: string }>;
 }) {
+  await requireScreen("bills");
   const sp = await searchParams;
   const { status, q, from, to } = sp;
   const page = pageFrom(sp.page);
@@ -64,7 +67,7 @@ export default async function BillsPage({
       <PageHeader
         title="Bills"
         description={`${total.toLocaleString()} ${status ? `· ${status.toLowerCase()}` : ""}${filterActive ? " · filtered" : ""}`}
-        actions={<Button asChild><Link href="/bills/new">New Bill</Link></Button>}
+        actions={<Writable><Button asChild><Link href="/bills/new">New Bill</Link></Button></Writable>}
       />
 
       <form className="flex flex-wrap items-end gap-3">
@@ -137,7 +140,7 @@ export default async function BillsPage({
             icon={FileText}
             title={status || filterActive ? "No bills match" : "No bills yet"}
             description={status || filterActive ? "Adjust filters or clear them." : "Record bills from suppliers to track AP."}
-            action={!status && !filterActive && <Button asChild><Link href="/bills/new">New Bill</Link></Button>}
+            action={!status && !filterActive && <Writable><Button asChild><Link href="/bills/new">New Bill</Link></Button></Writable>}
           />
         )}
         <Pager path="/bills" params={sp} page={page} total={total} />

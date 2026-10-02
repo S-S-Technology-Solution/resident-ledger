@@ -14,10 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineActions, type LineView } from "./line-actions";
 import { StatementActions } from "./statement-actions";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function StatementPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireScreen("bank-statements");
   const { id } = await params;
   const statement = await db.bankStatement.findUnique({
     where: { id },

@@ -8,6 +8,7 @@ import { amountInWords } from "@/lib/receipts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PrintButton } from "@/app/receipts/[id]/print-button";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 
 export default async function InvoiceViewPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireScreen("charges");
   const { id } = await params;
   const charge = await db.charge.findUnique({
     where: { id },

@@ -7,10 +7,12 @@ import { getAllSequenceConfigs } from "@/lib/numbering";
 import { getCurrentUser } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { ControlAccountsForm, SequenceForm } from "./forms";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DefaultsPage() {
+  await requireScreen("control-accounts");
   const [codes, sequences, accounts, me] = await Promise.all([
     controlAccountCodes(),
     getAllSequenceConfigs(),

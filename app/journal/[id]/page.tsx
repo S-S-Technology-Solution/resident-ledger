@@ -6,10 +6,13 @@ import { JournalEditor } from "../journal-editor";
 import { format } from "date-fns";
 import { VoidButton } from "./void-button";
 import { PageHeader } from "@/components/page-header";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
 export default async function ViewJournalPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireScreen("journal");
   const { id } = await params;
   const entry = await db.journalEntry.findUnique({
     where: { id },
@@ -39,7 +42,7 @@ export default async function ViewJournalPage({ params }: { params: Promise<{ id
             {entry.status === "DRAFT" && <Badge variant="outline">Draft</Badge>}
             {entry.status === "POSTED" && <Badge>Posted</Badge>}
             {entry.status === "VOIDED" && <Badge variant="destructive">Voided</Badge>}
-            {entry.status === "POSTED" && <VoidButton id={entry.id} />}
+            {entry.status === "POSTED" && <Writable><VoidButton id={entry.id} /></Writable>}
           </div>
         }
       />

@@ -8,10 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { VoidReceiptButton } from "./void-receipt-button";
 import { PrintButton } from "./print-button";
 import { ChequeReturnButton } from "./cheque-return-button";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReceiptViewPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireScreen("receipts");
   const { id } = await params;
   const receipt = await db.receipt.findUnique({
     where: { id },
@@ -45,9 +48,9 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
         <div className="flex gap-2">
           <PrintButton />
           {!receipt.voided && (
-            <ChequeReturnButton id={receipt.id} receiptNo={receipt.receiptNo} />
+            <Writable><ChequeReturnButton id={receipt.id} receiptNo={receipt.receiptNo} /></Writable>
           )}
-          {!receipt.voided && <VoidReceiptButton id={receipt.id} />}
+          {!receipt.voided && <Writable><VoidReceiptButton id={receipt.id} /></Writable>}
         </div>
       </div>
 

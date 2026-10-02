@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { DateRange } from "../_components/date-range";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function CashFlowPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await requireScreen("reports");
   const { from, to } = await searchParams;
   const fromDate = from ? new Date(from) : undefined;
   const toDate = to ? new Date(to) : new Date();

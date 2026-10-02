@@ -10,6 +10,7 @@ import { ageingBucket } from "@/lib/ar";
 import { Button } from "@/components/ui/button";
 import { PrintButton } from "@/app/receipts/[id]/print-button";
 import { DateRange } from "@/app/reports/_components/date-range";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function StatementPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await requireScreen("residents");
   const { id } = await params;
   const { from, to } = await searchParams;
 

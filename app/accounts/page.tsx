@@ -11,6 +11,8 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,7 @@ export default async function AccountsPage({
 }: {
   searchParams: Promise<{ type?: string }>;
 }) {
+  await requireScreen("accounts");
   const { type } = await searchParams;
   const accounts = await db.account.findMany({
     where: {
@@ -40,7 +43,7 @@ export default async function AccountsPage({
       <PageHeader
         title="Chart of Accounts"
         description={`${accounts.length} accounts`}
-        actions={<AccountDialog mode="create" />}
+        actions={<Writable><AccountDialog mode="create" /></Writable>}
       />
 
       <nav className="flex items-center gap-1 text-sm border-b">
@@ -83,12 +86,12 @@ export default async function AccountsPage({
                   {a.active ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge>}
                 </TableCell>
                 <TableCell className="text-right space-x-2">
-                  <AccountDialog mode="edit" account={{
+                  <Writable><AccountDialog mode="edit" account={{
                     id: a.id, code: a.code, name: a.name, type: a.type, normalSide: a.normalSide,
                     group: a.group, classifiedAs: a.classifiedAs,
-                  }} />
-                  <ToggleButton id={a.id} active={a.active} />
-                  <DeleteButton id={a.id} code={a.code} />
+                  }} /></Writable>
+                  <Writable><ToggleButton id={a.id} active={a.active} /></Writable>
+                  <Writable><DeleteButton id={a.id} code={a.code} /></Writable>
                 </TableCell>
               </TableRow>
             ))}
@@ -99,7 +102,7 @@ export default async function AccountsPage({
             icon={BookOpen}
             title={type ? `No ${type.toLowerCase()} accounts` : "No accounts yet"}
             description={type ? "Switch filter or add one for this type." : "Add the first account to start posting journal entries."}
-            action={!type && <AccountDialog mode="create" />}
+            action={!type && <Writable><AccountDialog mode="create" /></Writable>}
           />
         )}
       </DataCard>

@@ -7,10 +7,13 @@ import { StatCard } from "@/components/stat-card";
 import { Empty } from "@/components/empty";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
+  await requireScreen("dashboard");
   const s = await dashboardStats();
   const monthLabel = format(new Date(), "MMMM yyyy");
 
@@ -21,15 +24,15 @@ export default async function Dashboard() {
         description={"Snapshot for " + monthLabel}
         actions={
           <>
-            <Button asChild>
+            <Writable><Button asChild>
               <Link href="/receipts/new"><Plus className="h-4 w-4" />New Receipt</Link>
-            </Button>
-            <Button asChild variant="outline">
+            </Button></Writable>
+            <Writable><Button asChild variant="outline">
               <Link href="/bills/new"><FileText className="h-4 w-4" />New Bill</Link>
-            </Button>
-            <Button asChild variant="outline">
+            </Button></Writable>
+            <Writable><Button asChild variant="outline">
               <Link href="/charges/new"><CircleDollarSign className="h-4 w-4" />New Charge</Link>
-            </Button>
+            </Button></Writable>
           </>
         }
       />
@@ -102,7 +105,7 @@ export default async function Dashboard() {
             <Empty
               icon={ReceiptIcon}
               title="No receipts yet"
-              action={<Button asChild size="sm"><Link href="/receipts/new">Take payment</Link></Button>}
+              action={<Writable><Button asChild size="sm"><Link href="/receipts/new">Take payment</Link></Button></Writable>}
             />
           ) : (
             <ul className="divide-y">

@@ -14,6 +14,8 @@ import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
 import type { Prisma } from "@prisma/client";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ export default async function JournalPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string; page?: string }>;
 }) {
+  await requireScreen("journal");
   const sp = await searchParams;
   const { q, status, from, to } = sp;
   const page = pageFrom(sp.page);
@@ -56,7 +59,7 @@ export default async function JournalPage({
       <PageHeader
         title="Journal Entries"
         description={`${total.toLocaleString()} ${total === 1 ? "entry" : "entries"}`}
-        actions={<Button asChild><Link href="/journal/new">New Entry</Link></Button>}
+        actions={<Writable><Button asChild><Link href="/journal/new">New Entry</Link></Button></Writable>}
       />
 
       <form className="flex flex-wrap items-end gap-3">
@@ -126,7 +129,7 @@ export default async function JournalPage({
             icon={ScrollText}
             title={q || status || from || to ? "No entries match" : "No journal entries"}
             description={q || status || from || to ? "Adjust filters or clear them." : "Create your first entry, or one will be created automatically when you record a charge, receipt or bill."}
-            action={!q && !status && !from && !to && <Button asChild><Link href="/journal/new">New Entry</Link></Button>}
+            action={!q && !status && !from && !to && <Writable><Button asChild><Link href="/journal/new">New Entry</Link></Button></Writable>}
           />
         )}
         <Pager path="/journal" params={sp} page={page} total={total} />

@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import Decimal from "decimal.js";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { prepareEntry } from "@/lib/journal";
 import { recordAudit } from "@/lib/audit";
 import { requirePosting } from "@/lib/permissions";
-import { postCharge, postChargesBulk, type ChargeInput } from "@/lib/charge-posting";
+import { postCharge, type ChargeInput } from "@/lib/charge-posting";
+import { generateMonthlyFees } from "@/lib/monthly-fees";
 import { attempt } from "@/lib/action-server";
 
 export type { ChargeInput } from "@/lib/charge-posting";
@@ -33,26 +33,7 @@ export async function bulkGenerate(input: z.infer<typeof bulkSchema>) {
   return attempt(async () => {
     await requirePosting();
     const data = bulkSchema.parse(input);
-    const residents = await db.resident.findMany({
-      where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },
-      orderBy: { debtorCode: "asc" },
-    });
-    const already = new Set(
-      (await db.charge.findMany({
-        where: { associationId: DEFAULT_ASSOCIATION_ID, periodMonth: data.periodMonth, periodYear: data.periodYear, voided: false },
-        select: { residentId: true },
-      })).map((c) => c.residentId),
-    );
-    const due = residents.filter((r) => new Decimal(r.monthlyFee.toString()).gt(0) && !already.has(r.id));
-    const skipped = residents.length - due.length;
-    const created = await postChargesBulk(due.map((r) => ({
-      residentId: r.id,
-      date: data.date,
-      periodMonth: data.periodMonth,
-      periodYear: data.periodYear,
-      amount: new Decimal(r.monthlyFee.toString()).toFixed(2),
-      description: `Monthly fee — ${data.periodYear}-${String(data.periodMonth).padStart(2, "0")}`,
-    })));
+    const { created, skipped } = await generateMonthlyFees(data);
     revalidatePath("/charges");
     revalidatePath("/residents");
     return { created, skipped };

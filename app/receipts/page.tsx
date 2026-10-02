@@ -13,6 +13,8 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
 import type { Prisma } from "@prisma/client";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export default async function ReceiptsPage({
 }: {
   searchParams: Promise<{ q?: string; from?: string; to?: string; page?: string }>;
 }) {
+  await requireScreen("receipts");
   const sp = await searchParams;
   const { q, from, to } = sp;
   const page = pageFrom(sp.page);
@@ -54,7 +57,7 @@ export default async function ReceiptsPage({
       <PageHeader
         title="Receipts"
         description={`${total.toLocaleString()} ${filterActive ? (total === 1 ? "match" : "matches") : "receipts, newest first"}`}
-        actions={<Button asChild><Link href="/receipts/new">New Receipt</Link></Button>}
+        actions={<Writable><Button asChild><Link href="/receipts/new">New Receipt</Link></Button></Writable>}
       />
 
       <form className="flex flex-wrap items-end gap-3">
@@ -108,7 +111,7 @@ export default async function ReceiptsPage({
             icon={ReceiptIcon}
             title={filterActive ? "No receipts match" : "No receipts yet"}
             description={filterActive ? "Try a different search or clear the filters." : "Take a payment to issue the first official receipt."}
-            action={!filterActive && <Button asChild><Link href="/receipts/new">Take payment</Link></Button>}
+            action={!filterActive && <Writable><Button asChild><Link href="/receipts/new">Take payment</Link></Button></Writable>}
           />
         )}
         <Pager path="/receipts" params={sp} page={page} total={total} />

@@ -10,10 +10,12 @@ import { Empty } from "@/components/empty";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UploadForm } from "./upload-form";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function BankStatementsPage() {
+  await requireScreen("bank-statements");
   const statements = await db.bankStatement.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID },
     orderBy: { periodFrom: "desc" },

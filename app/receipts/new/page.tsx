@@ -5,6 +5,7 @@ import { residentOutstanding } from "@/lib/ar";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ReceiptForm } from "./receipt-form";
+import { requireWrite } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function NewReceiptPage({
 }: {
   searchParams: Promise<{ residentId?: string }>;
 }) {
+  await requireWrite("receipts", "/receipts");
   const { residentId } = await searchParams;
   const residents = await db.resident.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },

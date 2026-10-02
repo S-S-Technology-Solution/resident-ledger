@@ -6,6 +6,8 @@ import { Empty } from "@/components/empty";
 import { fmtRM } from "@/lib/money";
 import { listFiscalYears } from "@/lib/year-end";
 import { CloseYearDialog, ReopenYearButton } from "./close-dialog";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ function fmtDate(d: Date | null) {
 }
 
 export default async function YearEndPage() {
+  await requireScreen("year-end");
   const { years, lockedThrough } = await listFiscalYears();
 
   return (
@@ -54,7 +57,7 @@ export default async function YearEndPage() {
                   {y.surplus ? fmtRM(y.surplus) : "—"}
                 </TableCell>
                 <TableCell className="text-right">
-                  {y.closed ? <ReopenYearButton year={y.year} /> : <CloseYearDialog year={y.year} />}
+                  {y.closed ? <Writable><ReopenYearButton year={y.year} /></Writable> : <Writable><CloseYearDialog year={y.year} /></Writable>}
                 </TableCell>
               </TableRow>
             ))}

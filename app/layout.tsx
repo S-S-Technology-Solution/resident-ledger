@@ -7,6 +7,7 @@ import { currentSession } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/permissions";
 import { clearSessionCookie } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { SCREENS, canSeeScreen } from "@/lib/screens";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -23,12 +24,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Middleware runs on the edge and can only check the cookie's signature, so a
   // user deactivated mid-session would keep read access until it expired. Catch
   // that here, where the database is reachable.
+  let allowed = SCREENS.map((s) => s.key);
   if (session) {
     const user = await getCurrentUser().catch(() => null);
     if (!user || !user.active) {
       await clearSessionCookie().catch(() => {});
       redirect("/login");
     }
+    // The menu lists only screens this user may open; each page checks again.
+    allowed = allowed.filter((k) => canSeeScreen(user, k));
   }
 
   return (
@@ -36,9 +40,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className="min-h-full bg-background text-foreground">
         {session ? (
           <div className="flex min-h-screen">
-            <DesktopSidebar />
+            <DesktopSidebar allowed={allowed} />
             <div className="flex min-w-0 flex-1 flex-col">
-              <Topbar />
+              <Topbar allowed={allowed} />
               <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
                 <div className="mx-auto w-full max-w-6xl">{children}</div>
               </main>

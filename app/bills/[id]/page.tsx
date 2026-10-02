@@ -14,10 +14,13 @@ import { PayBillButton } from "./pay-bill-button";
 import { VoidBillButton } from "./void-bill-button";
 import { VoidPaymentButton } from "./void-payment-button";
 import Link from "next/link";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
 export default async function BillDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireScreen("bills");
   const { id } = await params;
   const bill = await db.bill.findUnique({
     where: { id },
@@ -51,8 +54,8 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
         actions={
           <div className="no-print flex gap-2 items-center">
             {statusBadge}
-            {bill.status !== "VOIDED" && bill.status !== "PAID" && <PayBillButton billId={bill.id} open={open.toFixed(2)} />}
-            {bill.status !== "VOIDED" && bill.payments.length === 0 && <VoidBillButton id={bill.id} />}
+            {bill.status !== "VOIDED" && bill.status !== "PAID" && <Writable><PayBillButton billId={bill.id} open={open.toFixed(2)} /></Writable>}
+            {bill.status !== "VOIDED" && bill.payments.length === 0 && <Writable><VoidBillButton id={bill.id} /></Writable>}
           </div>
         }
       />
@@ -92,7 +95,7 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
                         Cheque
                       </Link>
                     )}
-                    {bill.status !== "VOIDED" && <VoidPaymentButton id={p.id} />}
+                    {bill.status !== "VOIDED" && <Writable><VoidPaymentButton id={p.id} /></Writable>}
                   </TableCell>
                 </TableRow>
               ))}

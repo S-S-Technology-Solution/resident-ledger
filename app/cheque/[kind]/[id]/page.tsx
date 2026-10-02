@@ -5,6 +5,7 @@ import { getAssociation } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
 import { amountInWords } from "@/lib/receipts";
 import { PrintButton } from "@/app/receipts/[id]/print-button";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function ChequePage({
 }: {
   params: Promise<{ kind: string; id: string }>;
 }) {
+  await requireScreen("bills");
   const { kind, id } = await params;
   const association = await getAssociation();
 

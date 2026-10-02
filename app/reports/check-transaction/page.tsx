@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function CheckTransactionPage({
 }: {
   searchParams: Promise<Search>;
 }) {
+  await requireScreen("reports");
   const { q, amount, from, to, status } = await searchParams;
   const hasFilter = Boolean(q || amount || from || to || status);
 

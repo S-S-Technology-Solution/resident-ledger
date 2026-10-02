@@ -20,6 +20,8 @@ export type CurrentUser = {
   email: string;
   role: UserRole;
   active: boolean;
+  allScreens: boolean;
+  screens: string[];
 };
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -27,7 +29,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!session) return null;
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, name: true, email: true, role: true, active: true },
+    select: { id: true, name: true, email: true, role: true, active: true, allScreens: true, screens: true },
   });
   return user ?? null;
 }

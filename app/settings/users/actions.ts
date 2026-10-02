@@ -8,6 +8,7 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { requireAdmin } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { attempt } from "@/lib/action-server";
+import { SCREEN_KEYS, type ScreenKey } from "@/lib/screens";
 
 const schema = z.object({
   id: z.string().optional(),
@@ -15,6 +16,10 @@ const schema = z.object({
   email: z.string().email("Enter a valid email address"),
   role: z.enum(["ADMIN", "TREASURER", "VIEWER"]),
   password: z.string().min(8, "Use at least 8 characters").optional().or(z.literal("")),
+  allScreens: z.boolean().default(true),
+  screens: z.array(z.enum(SCREEN_KEYS as [ScreenKey, ...ScreenKey[]])).default([]),
+}).refine((d) => d.role === "ADMIN" || d.allScreens || d.screens.length > 0, {
+  message: "Tick at least one screen, or give access to all screens.",
 });
 
 export async function upsertUser(input: z.infer<typeof schema>) {
@@ -42,12 +47,17 @@ export async function upsertUser(input: z.infer<typeof schema>) {
           name: data.name,
           email: data.email,
           role: data.role,
+          allScreens: data.role === "ADMIN" || data.allScreens,
+          screens: data.role === "ADMIN" || data.allScreens ? [] : data.screens,
           ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}),
         },
       });
       await recordAudit("user", data.id, "update", {
-        before: { email: existing.email, role: existing.role },
-        after: { email: data.email, role: data.role, passwordChanged: Boolean(data.password) },
+        before: { email: existing.email, role: existing.role, allScreens: existing.allScreens, screens: existing.screens },
+        after: {
+          email: data.email, role: data.role, passwordChanged: Boolean(data.password),
+          allScreens: data.role === "ADMIN" || data.allScreens, screens: data.screens,
+        },
       });
     } else {
       if (!data.password) throw new Error("Set a password for the new user");
@@ -60,11 +70,13 @@ export async function upsertUser(input: z.infer<typeof schema>) {
           name: data.name,
           email: data.email,
           role: data.role,
+          allScreens: data.role === "ADMIN" || data.allScreens,
+          screens: data.role === "ADMIN" || data.allScreens ? [] : data.screens,
           passwordHash: await bcrypt.hash(data.password, 10),
         },
       });
       await recordAudit("user", created.id, "create", {
-        after: { email: data.email, role: data.role, createdBy: admin.email },
+        after: { email: data.email, role: data.role, allScreens: data.allScreens, screens: data.screens, createdBy: admin.email },
       });
     }
 

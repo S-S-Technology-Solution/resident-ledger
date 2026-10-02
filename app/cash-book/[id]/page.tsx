@@ -9,10 +9,13 @@ import { PrintButton } from "@/app/receipts/[id]/print-button";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { VoidCashEntryButton } from "./void-button";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
 export default async function CashEntryPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireScreen("cash-book");
   const { id } = await params;
   const entry = await db.cashEntry.findUnique({
     where: { id },
@@ -51,7 +54,7 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
               <Link href={`/cheque/cash/${entry.id}`}>Print cheque</Link>
             </Button>
           )}
-          {!entry.voided && <VoidCashEntryButton id={entry.id} refNo={entry.refNo} />}
+          {!entry.voided && <Writable><VoidCashEntryButton id={entry.id} refNo={entry.refNo} /></Writable>}
         </div>
       </div>
 

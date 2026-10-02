@@ -15,10 +15,13 @@ import { StatCard } from "@/components/stat-card";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { VoidChargeButton } from "@/app/charges/void-charge-button";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
 export default async function ResidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireScreen("residents");
   const { id } = await params;
   const resident = await db.resident.findUnique({ where: { id } });
   if (!resident) notFound();
@@ -47,8 +50,8 @@ export default async function ResidentDetailPage({ params }: { params: Promise<{
         actions={
           <div className="no-print flex gap-2">
             <Button asChild variant="outline"><Link href={`/residents/${id}/statement`}>Statement</Link></Button>
-            <Button asChild variant="outline"><Link href={`/charges/new?residentId=${id}`}>Add Charge</Link></Button>
-            <Button asChild><Link href={`/receipts/new?residentId=${id}`}>Take Payment</Link></Button>
+            <Writable><Button asChild variant="outline"><Link href={`/charges/new?residentId=${id}`}>Add Charge</Link></Button></Writable>
+            <Writable><Button asChild><Link href={`/receipts/new?residentId=${id}`}>Take Payment</Link></Button></Writable>
           </div>
         }
       />
@@ -153,7 +156,7 @@ export default async function ResidentDetailPage({ params }: { params: Promise<{
                     <TableCell>{c.description}</TableCell>
                     <TableCell className="text-right font-mono tabular">{fmtRM(c.amount)}</TableCell>
                     <TableCell className="text-right">
-                      {c.voided ? <Badge variant="destructive">Voided</Badge> : <VoidChargeButton id={c.id} />}
+                      {c.voided ? <Badge variant="destructive">Voided</Badge> : <Writable><VoidChargeButton id={c.id} /></Writable>}
                     </TableCell>
                   </TableRow>
                 ))}

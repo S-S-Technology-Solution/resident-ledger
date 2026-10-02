@@ -9,6 +9,7 @@ import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function ARAgeingPage({
 }: {
   searchParams: Promise<{ to?: string }>;
 }) {
+  await requireScreen("reports");
   const { to } = await searchParams;
   const asOf = to ? new Date(to) : new Date();
 

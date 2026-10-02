@@ -4,10 +4,12 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { BillForm } from "./bill-form";
+import { requireWrite } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewBillPage() {
+  await requireWrite("bills", "/bills");
   const [suppliers, expenseAccounts] = await Promise.all([
     db.supplier.findMany({
       where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },

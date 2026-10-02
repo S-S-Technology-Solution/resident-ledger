@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function BillListingPage({
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
+  await requireScreen("reports");
   const { view: raw } = await searchParams;
   const view: ViewKey = VIEWS.some((v) => v.key === raw) ? (raw as ViewKey) : "unpaid";
   const today = new Date();

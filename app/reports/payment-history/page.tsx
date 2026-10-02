@@ -13,6 +13,7 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { Receipt as ReceiptIcon } from "lucide-react";
 import { ResidentPicker } from "./resident-picker";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function PaymentHistoryPage({
 }: {
   searchParams: Promise<{ residentId?: string; from?: string; to?: string }>;
 }) {
+  await requireScreen("reports");
   const { residentId, from, to } = await searchParams;
   const residents = await db.resident.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID },

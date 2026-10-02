@@ -1,10 +1,12 @@
 import { getAssociation } from "@/lib/association";
 import { PageHeader } from "@/components/page-header";
 import { SettingsForm } from "./settings-form";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
+  await requireScreen("settings");
   const a = await getAssociation();
   return (
     <div className="space-y-6">

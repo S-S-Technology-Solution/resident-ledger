@@ -4,10 +4,12 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { JournalEditor } from "../journal-editor";
+import { requireWrite } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewJournalPage() {
+  await requireWrite("journal", "/journal");
   const accounts = await db.account.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },
     orderBy: { code: "asc" },

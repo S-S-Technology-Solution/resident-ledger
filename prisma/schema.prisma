@@ -151,6 +151,11 @@ model User {
   name          String
   role          UserRole    @default(ADMIN)
   active        Boolean     @default(true)
+  // Screens this user may open. Administrators always see everything; anyone
+  // else sees every screen when allScreens is true, otherwise only those listed
+  // (keys from lib/screens.ts).
+  allScreens    Boolean     @default(true)
+  screens       String[]    @default([])
   associationId String
   association   Association @relation(fields: [associationId], references: [id])
   createdAt     DateTime    @default(now())

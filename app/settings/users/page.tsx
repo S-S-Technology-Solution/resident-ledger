@@ -7,10 +7,13 @@ import { DataCard } from "@/components/data-card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserDialog, ToggleUserButton } from "./user-dialog";
+import { requireScreen } from "@/lib/screen-guard";
+import { SCREENS } from "@/lib/screens";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
+  await requireScreen("users");
   const [users, me] = await Promise.all([
     db.user.findMany({
       where: { associationId: DEFAULT_ASSOCIATION_ID },
@@ -42,6 +45,7 @@ export default async function UsersPage() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="w-40">Role</TableHead>
+              <TableHead>Screens</TableHead>
               <TableHead className="w-28">Status</TableHead>
               <TableHead className="w-32">Added</TableHead>
               <TableHead className="w-48 text-right">Actions</TableHead>
@@ -60,6 +64,11 @@ export default async function UsersPage() {
                     {ROLE_LABEL[u.role]}
                   </Badge>
                 </TableCell>
+                <TableCell className="whitespace-normal text-xs text-muted-foreground">
+                  {u.role === "ADMIN" || u.allScreens
+                    ? "All"
+                    : SCREENS.filter((s) => u.screens.includes(s.key)).map((s) => s.label).join(", ")}
+                </TableCell>
                 <TableCell>
                   {u.active ? <Badge>Active</Badge> : <Badge variant="outline">Disabled</Badge>}
                 </TableCell>
@@ -71,7 +80,7 @@ export default async function UsersPage() {
                     <>
                       <UserDialog
                         mode="edit"
-                        user={{ id: u.id, name: u.name, email: u.email, role: u.role }}
+                        user={{ id: u.id, name: u.name, email: u.email, role: u.role, allScreens: u.allScreens, screens: u.screens }}
                       />
                       {u.id !== me?.id && <ToggleUserButton id={u.id} active={u.active} />}
                     </>

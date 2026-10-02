@@ -21,6 +21,8 @@ import {
   batchTransactions,
 } from "@/lib/export/reports";
 import type { ReportData } from "@/lib/export/types";
+import { getCurrentUser } from "@/lib/permissions";
+import { canSeeScreen } from "@/lib/screens";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +63,10 @@ async function buildReport(slug: string, sp: URLSearchParams): Promise<ReportDat
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const user = await getCurrentUser();
+  if (!user || !user.active || !canSeeScreen(user, "reports")) {
+    return NextResponse.json({ error: "You don't have access to reports." }, { status: 403 });
+  }
   const { slug } = await params;
   const sp = req.nextUrl.searchParams;
   const format = (sp.get("format") ?? "pdf").toLowerCase();

@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { format } from "date-fns";
 import Decimal from "decimal.js";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function BSPage({
 }: {
   searchParams: Promise<{ to?: string }>;
 }) {
+  await requireScreen("reports");
   const { to } = await searchParams;
   const asOf = to ? new Date(to) : new Date();
   const all = await accountBalances({ to: asOf });

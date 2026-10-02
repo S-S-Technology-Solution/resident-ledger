@@ -25,6 +25,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { screenForPath, type ScreenKey } from "@/lib/screens";
 import {
   Sheet,
   SheetContent,
@@ -32,51 +33,55 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+type Item = { href: string; label: string; screen: ScreenKey; icon: React.ComponentType<{ className?: string }> };
 
 const groups: { title: string; items: Item[] }[] = [
-  { title: "Overview", items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }] },
+  { title: "Overview", items: [{ href: "/", screen: "dashboard", label: "Dashboard", icon: LayoutDashboard }] },
   {
     title: "Sales",
     items: [
-      { href: "/residents", label: "Residents", icon: Users },
-      { href: "/charges", label: "Charges", icon: CreditCard },
-      { href: "/receipts", label: "Receipts", icon: Receipt },
+      { href: "/residents", screen: "residents", label: "Residents", icon: Users },
+      { href: "/charges", screen: "charges", label: "Charges", icon: CreditCard },
+      { href: "/receipts", screen: "receipts", label: "Receipts", icon: Receipt },
     ],
   },
   {
     title: "Purchases",
     items: [
-      { href: "/suppliers", label: "Suppliers", icon: Truck },
-      { href: "/bills", label: "Bills", icon: FileText },
+      { href: "/suppliers", screen: "suppliers", label: "Suppliers", icon: Truck },
+      { href: "/bills", screen: "bills", label: "Bills", icon: FileText },
     ],
   },
   {
     title: "Ledger",
     items: [
-      { href: "/accounts", label: "Chart of Accounts", icon: BookOpen },
-      { href: "/cash-book", label: "Cash Book", icon: Wallet },
-      { href: "/journal", label: "Journal", icon: ScrollText },
-      { href: "/batches", label: "Batches", icon: Layers },
-      { href: "/bank-statements", label: "Bank Statements", icon: FileSpreadsheet },
+      { href: "/accounts", screen: "accounts", label: "Chart of Accounts", icon: BookOpen },
+      { href: "/cash-book", screen: "cash-book", label: "Cash Book", icon: Wallet },
+      { href: "/journal", screen: "journal", label: "Journal", icon: ScrollText },
+      { href: "/batches", screen: "batches", label: "Batches", icon: Layers },
+      { href: "/bank-statements", screen: "bank-statements", label: "Bank Statements", icon: FileSpreadsheet },
     ],
   },
-  { title: "Reports", items: [{ href: "/reports", label: "All Reports", icon: BarChart3 }] },
+  { title: "Reports", items: [{ href: "/reports", screen: "reports", label: "All Reports", icon: BarChart3 }] },
   {
     title: "System",
     items: [
-      { href: "/opening-balances", label: "Opening Balances", icon: Scale },
-      { href: "/year-end", label: "Year End Closing", icon: CalendarCheck },
-      { href: "/settings/users", label: "Users", icon: UsersRound },
-      { href: "/settings/defaults", label: "Control Accounts", icon: SlidersHorizontal },
-      { href: "/settings/import", label: "Import Data", icon: Upload },
-      { href: "/settings", label: "Settings", icon: Settings },
+      { href: "/opening-balances", screen: "opening-balances", label: "Opening Balances", icon: Scale },
+      { href: "/year-end", screen: "year-end", label: "Year End Closing", icon: CalendarCheck },
+      { href: "/settings/users", screen: "users", label: "Users", icon: UsersRound },
+      { href: "/settings/defaults", screen: "control-accounts", label: "Control Accounts", icon: SlidersHorizontal },
+      { href: "/settings/import", screen: "import", label: "Import Data", icon: Upload },
+      { href: "/settings", screen: "settings", label: "Settings", icon: Settings },
     ],
   },
 ];
 
-function NavBody({ onNavigate }: { onNavigate?: () => void }) {
+function NavBody({ allowed, onNavigate }: { allowed: ScreenKey[]; onNavigate?: () => void }) {
   const path = usePathname();
+  const current = screenForPath(path);
+  const visible = groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => allowed.includes(i.screen)) }))
+    .filter((g) => g.items.length > 0);
   return (
     <div className="flex h-full flex-col">
       <Link
@@ -93,7 +98,7 @@ function NavBody({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </Link>
       <nav className="flex-1 flex flex-col overflow-y-auto px-3 py-4 space-y-6">
-        {groups.map((g) => (
+        {visible.map((g) => (
           <div
             key={g.title}
             className={cn("space-y-1", g.title === "System" && "mt-auto")}
@@ -102,7 +107,7 @@ function NavBody({ onNavigate }: { onNavigate?: () => void }) {
               {g.title}
             </div>
             {g.items.map((item) => {
-              const active = path === item.href || (item.href !== "/" && path.startsWith(item.href));
+              const active = current === item.screen;
               const Icon = item.icon;
               return (
                 <Link
@@ -128,15 +133,15 @@ function NavBody({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function DesktopSidebar() {
+export function DesktopSidebar({ allowed }: { allowed: ScreenKey[] }) {
   return (
     <aside className="hidden lg:flex sticky top-0 h-svh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border no-print">
-      <NavBody />
+      <NavBody allowed={allowed} />
     </aside>
   );
 }
 
-export function MobileMenuButton() {
+export function MobileMenuButton({ allowed }: { allowed: ScreenKey[] }) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -154,7 +159,7 @@ export function MobileMenuButton() {
         className="w-72 p-0 bg-sidebar text-sidebar-foreground border-sidebar-border"
       >
         <SheetTitle className="sr-only">Navigation</SheetTitle>
-        <NavBody onNavigate={() => setOpen(false)} />
+        <NavBody allowed={allowed} onNavigate={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   );

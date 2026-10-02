@@ -7,6 +7,7 @@ import { fmtRM } from "@/lib/money";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function TwelveMonthPage({
 }: {
   searchParams: Promise<{ year?: string }>;
 }) {
+  await requireScreen("reports");
   const { year: rawYear } = await searchParams;
   const year = rawYear ? Number(rawYear) : new Date().getFullYear();
 

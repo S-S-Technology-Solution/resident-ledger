@@ -3,6 +3,7 @@ import { ChevronRight, BookOpen, TrendingUp, Scale, ArrowDownRight, ArrowUpRight
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { requireScreen } from "@/lib/screen-guard";
 
 type Item = { href: string; title: string; description: string };
 type Section = { title: string; icon: LucideIcon; items: Item[] };
@@ -83,7 +84,8 @@ const sections: Section[] = [
   },
 ];
 
-export default function ReportsIndex() {
+export default async function ReportsIndex() {
+  await requireScreen("reports");
   return (
     <div className="space-y-8">
       <PageHeader title="Reports" />

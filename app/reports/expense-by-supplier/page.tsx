@@ -8,6 +8,7 @@ import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function ExpenseBySupplierPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await requireScreen("reports");
   const { from, to } = await searchParams;
   const where = {
     associationId: DEFAULT_ASSOCIATION_ID,

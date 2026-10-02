@@ -11,6 +11,7 @@ import { Empty } from "@/components/empty";
 import { AccountPicker } from "./account-picker";
 import { format } from "date-fns";
 import { BookOpen } from "lucide-react";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function GLPage({
 }: {
   searchParams: Promise<{ accountId?: string; from?: string; to?: string }>;
 }) {
+  await requireScreen("reports");
   const { accountId, from, to } = await searchParams;
 
   const accounts = await db.account.findMany({

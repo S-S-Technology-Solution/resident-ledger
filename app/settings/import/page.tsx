@@ -1,10 +1,12 @@
 import { getCurrentUser } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { ImportForm } from "./import-form";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
+  await requireScreen("import");
   const me = await getCurrentUser();
   const readOnly = me?.role !== "ADMIN";
 

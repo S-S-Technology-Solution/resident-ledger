@@ -15,6 +15,8 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
 import type { Prisma } from "@prisma/client";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,7 @@ export default async function ChargesPage({
 }: {
   searchParams: Promise<{ q?: string; from?: string; to?: string; page?: string }>;
 }) {
+  await requireScreen("charges");
   const sp = await searchParams;
   const { q, from, to } = sp;
   const page = pageFrom(sp.page);
@@ -57,8 +60,8 @@ export default async function ChargesPage({
         description={`${total.toLocaleString()} ${filterActive ? (total === 1 ? "match" : "matches") : "charges, newest first"}`}
         actions={
           <>
-            <BulkGenerateButton />
-            <Button asChild><Link href="/charges/new">New Charge</Link></Button>
+            <Writable><BulkGenerateButton /></Writable>
+            <Writable><Button asChild><Link href="/charges/new">New Charge</Link></Button></Writable>
           </>
         }
       />
@@ -111,7 +114,7 @@ export default async function ChargesPage({
                 <TableCell className="text-right font-mono tabular">{fmtRM(c.amount)}</TableCell>
                 <TableCell>{c.voided ? <Badge variant="destructive">Voided</Badge> : <Badge>Posted</Badge>}</TableCell>
                 <TableCell className="text-right">
-                  {!c.voided && <VoidChargeButton id={c.id} />}
+                  {!c.voided && <Writable><VoidChargeButton id={c.id} /></Writable>}
                 </TableCell>
               </TableRow>
             ))}
@@ -122,7 +125,7 @@ export default async function ChargesPage({
             icon={CreditCard}
             title={filterActive ? "No charges match" : "No charges yet"}
             description={filterActive ? "Try a different search or clear the filters." : "Create charges manually or bulk-generate the monthly fee for all residents."}
-            action={!filterActive && <Button asChild><Link href="/charges/new">New Charge</Link></Button>}
+            action={!filterActive && <Writable><Button asChild><Link href="/charges/new">New Charge</Link></Button></Writable>}
           />
         )}
         <Pager path="/charges" params={sp} page={page} total={total} />

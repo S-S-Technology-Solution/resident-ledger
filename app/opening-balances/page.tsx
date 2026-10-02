@@ -11,6 +11,7 @@ import {
 } from "@/lib/opening-balances";
 import { GLOpeningForm } from "./gl-form";
 import { SubsidiaryOpeningForm } from "./debtor-form";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function OpeningBalancesPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireScreen("opening-balances");
   const { tab } = await searchParams;
   const active = TABS.find((t) => t.key === tab)?.key ?? "gl";
 

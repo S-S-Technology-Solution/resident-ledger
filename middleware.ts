@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession, SESSION_COOKIE } from "@/lib/auth-verify";
 
-const PUBLIC_PREFIXES = ["/login", "/_next", "/favicon", "/api/health"];
+// /api/cron checks its own secret (Vercel Cron sends no session cookie).
+const PUBLIC_PREFIXES = ["/login", "/_next", "/favicon", "/api/health", "/api/cron"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

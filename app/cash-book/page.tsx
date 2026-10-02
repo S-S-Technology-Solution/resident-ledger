@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CashEntryDialog } from "./entry-dialog";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,7 @@ export default async function CashBookPage({
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
+  await requireScreen("cash-book");
   const sp = await searchParams;
   const page = pageFrom(sp.page);
   const where = { associationId: DEFAULT_ASSOCIATION_ID };
@@ -51,8 +54,8 @@ export default async function CashBookPage({
         description="Receipts and payments with no resident or supplier behind them"
         actions={
           <>
-            <CashEntryDialog direction="IN" accounts={accounts} />
-            <CashEntryDialog direction="OUT" accounts={accounts} />
+            <Writable><CashEntryDialog direction="IN" accounts={accounts} /></Writable>
+            <Writable><CashEntryDialog direction="OUT" accounts={accounts} /></Writable>
           </>
         }
       />

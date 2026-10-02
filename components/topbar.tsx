@@ -1,12 +1,13 @@
 import { MobileMenuButton } from "./sidebar-nav";
 import { getAssociation } from "@/lib/association";
 import { UserMenu } from "./user-menu";
+import type { ScreenKey } from "@/lib/screens";
 
-export async function Topbar() {
+export async function Topbar({ allowed }: { allowed: ScreenKey[] }) {
   const association = await getAssociation();
   return (
     <header className="flex items-center gap-3 border-b bg-card/80 backdrop-blur px-4 py-3 lg:px-6 no-print sticky top-0 z-30">
-      <MobileMenuButton />
+      <MobileMenuButton allowed={allowed} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold">{association.name}</div>
         <div className="hidden sm:block text-xs text-muted-foreground">

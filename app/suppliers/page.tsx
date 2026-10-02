@@ -8,17 +8,20 @@ import { ToggleSupplier } from "./toggle-supplier";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
 export default async function SuppliersPage() {
+  await requireScreen("suppliers");
   const rows = await supplierBalances();
   return (
     <div className="space-y-6">
       <PageHeader
         title="Suppliers"
         description={`${rows.length} ${rows.length === 1 ? "supplier" : "suppliers"}`}
-        actions={<SupplierDialog mode="create" />}
+        actions={<Writable><SupplierDialog mode="create" /></Writable>}
       />
       <DataCard>
         <Table>
@@ -43,10 +46,10 @@ export default async function SuppliersPage() {
                 <TableCell className={`text-right font-mono tabular ${s.balance.gt(0) ? "text-rose-600 font-semibold" : ""}`}>{fmtRM(s.balance)}</TableCell>
                 <TableCell>{s.active ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>
                 <TableCell className="text-right space-x-2">
-                  <SupplierDialog mode="edit" supplier={{
+                  <Writable><SupplierDialog mode="edit" supplier={{
                     id: s.id, name: s.name,
                     contact: s.contact ?? "", phone: s.phone ?? "", bankAccount: "",
-                  }} />
+                  }} /></Writable>
                   <ToggleSupplier id={s.id} active={s.active} />
                 </TableCell>
               </TableRow>
@@ -58,7 +61,7 @@ export default async function SuppliersPage() {
             icon={Truck}
             title="No suppliers yet"
             description="Add a supplier before recording bills."
-            action={<SupplierDialog mode="create" />}
+            action={<Writable><SupplierDialog mode="create" /></Writable>}
           />
         )}
       </DataCard>

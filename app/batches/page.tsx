@@ -10,6 +10,8 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { GROUP_LABEL } from "@/lib/batches";
 import { fmtRM } from "@/lib/money";
 import { GenerateBatchDialog, LockBatchButton, DeleteBatchButton } from "./generate-dialog";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function BatchesPage({
 }: {
   searchParams: Promise<{ year?: string }>;
 }) {
+  await requireScreen("batches");
   const { year } = await searchParams;
   const filterYear = year ? Number(year) : undefined;
 
@@ -42,7 +45,7 @@ export default async function BatchesPage({
       <PageHeader
         title="Batches"
         description="Transactions are filed into a monthly batch per group, the way the accountant works"
-        actions={<GenerateBatchDialog defaultYear={new Date().getFullYear()} />}
+        actions={<Writable><GenerateBatchDialog defaultYear={new Date().getFullYear()} /></Writable>}
       />
 
       {allYears.length > 1 && (
@@ -111,8 +114,8 @@ export default async function BatchesPage({
                     >
                       Print
                     </Link>
-                    <LockBatchButton id={b.id} locked={b.locked} />
-                    {b.entries.length === 0 && <DeleteBatchButton id={b.id} />}
+                    <Writable><LockBatchButton id={b.id} locked={b.locked} /></Writable>
+                    {b.entries.length === 0 && <Writable><DeleteBatchButton id={b.id} /></Writable>}
                   </TableCell>
                 </TableRow>
               );

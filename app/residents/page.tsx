@@ -10,6 +10,8 @@ import { fmtRM } from "@/lib/money";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { requireScreen } from "@/lib/screen-guard";
+import { Writable } from "@/components/writable";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function ResidentsPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await requireScreen("residents");
   const { q } = await searchParams;
   const all = await residentBalances();
   const rows = q
@@ -29,7 +32,7 @@ export default async function ResidentsPage({
       <PageHeader
         title="Residents"
         description={`${rows.length} of ${all.length}`}
-        actions={<ResidentDialog mode="create" />}
+        actions={<Writable><ResidentDialog mode="create" /></Writable>}
       />
 
       <form className="max-w-sm">
@@ -59,10 +62,10 @@ export default async function ResidentsPage({
                 <TableCell className={`text-right font-mono tabular ${r.balance.gt(0) ? "text-rose-600 font-semibold" : ""}`}>{fmtRM(r.balance)}</TableCell>
                 <TableCell>{r.active ? <Badge>Active</Badge> : <Badge variant="outline">Moved out</Badge>}</TableCell>
                 <TableCell className="text-right space-x-2">
-                  <ResidentDialog mode="edit" resident={{
+                  <Writable><ResidentDialog mode="edit" resident={{
                     id: r.id, unitAddress: r.unitAddress, ownerName: r.ownerName,
                     phone: "", monthlyFee: r.monthlyFee.toFixed(2),
-                  }} />
+                  }} /></Writable>
                   <ToggleResident id={r.id} active={r.active} />
                 </TableCell>
               </TableRow>
@@ -74,7 +77,7 @@ export default async function ResidentsPage({
             icon={Users}
             title={q ? "No matching residents" : "No residents yet"}
             description={q ? "Try a different search." : "Add residents to start tracking charges and payments."}
-            action={!q && <ResidentDialog mode="create" />}
+            action={!q && <Writable><ResidentDialog mode="create" /></Writable>}
           />
         )}
       </DataCard>

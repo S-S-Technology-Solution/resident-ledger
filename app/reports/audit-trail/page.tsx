@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ function summarise(value: unknown): string {
 }
 
 export default async function AuditTrailPage() {
+  await requireScreen("reports");
   const entries = await listAudit();
 
   return (

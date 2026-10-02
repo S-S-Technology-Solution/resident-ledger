@@ -11,6 +11,7 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { PrintButton } from "@/app/receipts/[id]/print-button";
 import { DateRange } from "../_components/date-range";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function RemittanceAdvicePage({
 }: {
   searchParams: Promise<{ supplierId?: string; from?: string; to?: string }>;
 }) {
+  await requireScreen("reports");
   const { supplierId, from, to } = await searchParams;
   const fromDate = from ? new Date(from) : undefined;
   const toDate = to ? new Date(to) : undefined;

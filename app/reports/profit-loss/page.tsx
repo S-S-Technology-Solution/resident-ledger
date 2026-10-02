@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { format } from "date-fns";
 import Decimal from "decimal.js";
+import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function PLPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await requireScreen("reports");
   const { from, to } = await searchParams;
   const range = { from: from ? new Date(from) : undefined, to: to ? new Date(to) : undefined };
   const all = await accountBalances(range);
