@@ -13,6 +13,8 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
+import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -28,25 +30,32 @@ function qs(p: Record<string, string | undefined>): string {
 export default async function BillsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; from?: string; to?: string; page?: string }>;
 }) {
-  const { status, q, from, to } = await searchParams;
-  const bills = await db.bill.findMany({
-    where: {
-      associationId: DEFAULT_ASSOCIATION_ID,
-      ...(status ? { status: status as "UNPAID" | "PARTIAL" | "PAID" | "VOIDED" } : {}),
-      ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-      ...(q ? {
-        OR: [
-          { invoiceNo: { contains: q, mode: "insensitive" } },
-          { supplier: { name: { contains: q, mode: "insensitive" } } },
-        ],
-      } : {}),
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    include: { supplier: true },
-    take: 200,
-  });
+  const sp = await searchParams;
+  const { status, q, from, to } = sp;
+  const page = pageFrom(sp.page);
+  const where = {
+    associationId: DEFAULT_ASSOCIATION_ID,
+    ...(status ? { status: status as "UNPAID" | "PARTIAL" | "PAID" | "VOIDED" } : {}),
+    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
+    ...(q ? {
+      OR: [
+        { invoiceNo: { contains: q, mode: "insensitive" } },
+        { supplier: { name: { contains: q, mode: "insensitive" } } },
+      ],
+    } : {}),
+  } satisfies Prisma.BillWhereInput;
+  const [bills, total] = await Promise.all([
+    db.bill.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      include: { supplier: true },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    db.bill.count({ where }),
+  ]);
 
   const filterActive = !!(q || from || to);
 
@@ -54,7 +63,7 @@ export default async function BillsPage({
     <div className="space-y-6">
       <PageHeader
         title="Bills"
-        description={`${bills.length} ${status ? `· ${status.toLowerCase()}` : ""}${filterActive ? " · filtered" : ""}`}
+        description={`${total.toLocaleString()} ${status ? `· ${status.toLowerCase()}` : ""}${filterActive ? " · filtered" : ""}`}
         actions={<Button asChild><Link href="/bills/new">New Bill</Link></Button>}
       />
 
@@ -131,6 +140,7 @@ export default async function BillsPage({
             action={!status && !filterActive && <Button asChild><Link href="/bills/new">New Bill</Link></Button>}
           />
         )}
+        <Pager path="/bills" params={sp} page={page} total={total} />
       </DataCard>
     </div>
   );

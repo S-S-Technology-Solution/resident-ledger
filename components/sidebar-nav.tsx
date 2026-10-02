@@ -130,7 +130,7 @@ function NavBody({ onNavigate }: { onNavigate?: () => void }) {
 
 export function DesktopSidebar() {
   return (
-    <aside className="hidden lg:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border no-print">
+    <aside className="hidden lg:flex sticky top-0 h-svh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border no-print">
       <NavBody />
     </aside>
   );

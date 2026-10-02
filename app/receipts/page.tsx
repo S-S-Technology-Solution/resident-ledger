@@ -11,32 +11,41 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReceiptsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; from?: string; to?: string; page?: string }>;
 }) {
-  const { q, from, to } = await searchParams;
-  const receipts = await db.receipt.findMany({
-    where: {
-      associationId: DEFAULT_ASSOCIATION_ID,
-      ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-      ...(q ? {
-        OR: [
-          { receiptNo: { contains: q, mode: "insensitive" } },
-          { bankRef: { contains: q, mode: "insensitive" } },
-          { resident: { unitAddress: { contains: q, mode: "insensitive" } } },
-          { resident: { ownerName: { contains: q, mode: "insensitive" } } },
-        ],
-      } : {}),
-    },
-    orderBy: [{ date: "desc" }, { receiptNo: "desc" }],
-    take: 200,
-    include: { resident: true },
-  });
+  const sp = await searchParams;
+  const { q, from, to } = sp;
+  const page = pageFrom(sp.page);
+  const where = {
+    associationId: DEFAULT_ASSOCIATION_ID,
+    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
+    ...(q ? {
+      OR: [
+        { receiptNo: { contains: q, mode: "insensitive" } },
+        { bankRef: { contains: q, mode: "insensitive" } },
+        { resident: { unitAddress: { contains: q, mode: "insensitive" } } },
+        { resident: { ownerName: { contains: q, mode: "insensitive" } } },
+      ],
+    } : {}),
+  } satisfies Prisma.ReceiptWhereInput;
+  const [receipts, total] = await Promise.all([
+    db.receipt.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { receiptNo: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: { resident: true },
+    }),
+    db.receipt.count({ where }),
+  ]);
 
   const filterActive = !!(q || from || to);
 
@@ -44,7 +53,7 @@ export default async function ReceiptsPage({
     <div className="space-y-6">
       <PageHeader
         title="Receipts"
-        description={`${receipts.length} ${filterActive ? "matches" : "most recent"}`}
+        description={`${total.toLocaleString()} ${filterActive ? (total === 1 ? "match" : "matches") : "receipts, newest first"}`}
         actions={<Button asChild><Link href="/receipts/new">New Receipt</Link></Button>}
       />
 
@@ -102,6 +111,7 @@ export default async function ReceiptsPage({
             action={!filterActive && <Button asChild><Link href="/receipts/new">Take payment</Link></Button>}
           />
         )}
+        <Pager path="/receipts" params={sp} page={page} total={total} />
       </DataCard>
     </div>
   );

@@ -10,17 +10,29 @@ import { Empty } from "@/components/empty";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CashEntryDialog } from "./entry-dialog";
+import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
 
 export const dynamic = "force-dynamic";
 
-export default async function CashBookPage() {
-  const [entries, accounts] = await Promise.all([
+export default async function CashBookPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const sp = await searchParams;
+  const page = pageFrom(sp.page);
+  const where = { associationId: DEFAULT_ASSOCIATION_ID };
+  const [entries, total, sums, accounts] = await Promise.all([
     db.cashEntry.findMany({
-      where: { associationId: DEFAULT_ASSOCIATION_ID },
+      where,
       orderBy: [{ date: "desc" }, { refNo: "desc" }],
-      take: 200,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
       include: { account: { select: { code: true, name: true } } },
     }),
+    db.cashEntry.count({ where }),
+    // Totals cover the whole cash book, not just the page on screen.
+    db.cashEntry.groupBy({ by: ["direction"], where: { ...where, voided: false }, _sum: { amount: true } }),
     db.account.findMany({
       where: { associationId: DEFAULT_ASSOCIATION_ID, active: true, type: { in: ["INCOME", "EXPENSE"] } },
       orderBy: { code: "asc" },
@@ -28,9 +40,9 @@ export default async function CashBookPage() {
     }),
   ]);
 
-  const live = entries.filter((e) => !e.voided);
-  const totalIn = live.filter((e) => e.direction === "IN").reduce((s, e) => s + Number(e.amount), 0);
-  const totalOut = live.filter((e) => e.direction === "OUT").reduce((s, e) => s + Number(e.amount), 0);
+  const sumOf = (d: "IN" | "OUT") => Number(sums.find((s) => s.direction === d)?._sum.amount ?? 0);
+  const totalIn = sumOf("IN");
+  const totalOut = sumOf("OUT");
 
   return (
     <div className="space-y-6">
@@ -100,6 +112,7 @@ export default async function CashBookPage() {
             description="Use this for money in or out that has no resident or supplier behind it — bank interest, a donation, a sundry payment."
           />
         )}
+        <Pager path="/cash-book" params={sp} page={page} total={total} />
       </DataCard>
     </div>
   );

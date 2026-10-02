@@ -12,6 +12,8 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
+import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -20,33 +22,40 @@ const STATUSES = ["DRAFT", "POSTED", "VOIDED"] as const;
 export default async function JournalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string; page?: string }>;
 }) {
-  const { q, status, from, to } = await searchParams;
+  const sp = await searchParams;
+  const { q, status, from, to } = sp;
+  const page = pageFrom(sp.page);
 
-  const entries = await db.journalEntry.findMany({
-    where: {
-      associationId: DEFAULT_ASSOCIATION_ID,
-      ...(status ? { status: status as "DRAFT" | "POSTED" | "VOIDED" } : {}),
-      ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-      ...(q ? {
-        OR: [
-          { description: { contains: q, mode: "insensitive" } },
-          { reference: { contains: q, mode: "insensitive" } },
-          { entryNo: { contains: q, mode: "insensitive" } },
-        ],
-      } : {}),
-    },
-    include: { lines: true },
-    orderBy: [{ date: "desc" }, { entryNo: "desc" }],
-    take: 200,
-  });
+  const where = {
+    associationId: DEFAULT_ASSOCIATION_ID,
+    ...(status ? { status: status as "DRAFT" | "POSTED" | "VOIDED" } : {}),
+    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
+    ...(q ? {
+      OR: [
+        { description: { contains: q, mode: "insensitive" } },
+        { reference: { contains: q, mode: "insensitive" } },
+        { entryNo: { contains: q, mode: "insensitive" } },
+      ],
+    } : {}),
+  } satisfies Prisma.JournalEntryWhereInput;
+  const [entries, total] = await Promise.all([
+    db.journalEntry.findMany({
+      where,
+      include: { lines: true },
+      orderBy: [{ date: "desc" }, { entryNo: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    db.journalEntry.count({ where }),
+  ]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Journal Entries"
-        description={`${entries.length} ${entries.length === 1 ? "entry" : "entries"}`}
+        description={`${total.toLocaleString()} ${total === 1 ? "entry" : "entries"}`}
         actions={<Button asChild><Link href="/journal/new">New Entry</Link></Button>}
       />
 
@@ -120,6 +129,7 @@ export default async function JournalPage({
             action={!q && !status && !from && !to && <Button asChild><Link href="/journal/new">New Entry</Link></Button>}
           />
         )}
+        <Pager path="/journal" params={sp} page={page} total={total} />
       </DataCard>
     </div>
   );

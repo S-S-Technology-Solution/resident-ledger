@@ -13,31 +13,40 @@ import { VoidChargeButton } from "./void-charge-button";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChargesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; from?: string; to?: string; page?: string }>;
 }) {
-  const { q, from, to } = await searchParams;
-  const charges = await db.charge.findMany({
-    where: {
-      associationId: DEFAULT_ASSOCIATION_ID,
-      ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-      ...(q ? {
-        OR: [
-          { description: { contains: q, mode: "insensitive" } },
-          { resident: { unitAddress: { contains: q, mode: "insensitive" } } },
-          { resident: { ownerName: { contains: q, mode: "insensitive" } } },
-        ],
-      } : {}),
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    take: 200,
-    include: { resident: true },
-  });
+  const sp = await searchParams;
+  const { q, from, to } = sp;
+  const page = pageFrom(sp.page);
+  const where = {
+    associationId: DEFAULT_ASSOCIATION_ID,
+    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
+    ...(q ? {
+      OR: [
+        { description: { contains: q, mode: "insensitive" } },
+        { resident: { unitAddress: { contains: q, mode: "insensitive" } } },
+        { resident: { ownerName: { contains: q, mode: "insensitive" } } },
+      ],
+    } : {}),
+  } satisfies Prisma.ChargeWhereInput;
+  const [charges, total] = await Promise.all([
+    db.charge.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: { resident: true },
+    }),
+    db.charge.count({ where }),
+  ]);
 
   const filterActive = !!(q || from || to);
 
@@ -45,7 +54,7 @@ export default async function ChargesPage({
     <div className="space-y-6">
       <PageHeader
         title="Charges"
-        description={`${charges.length} ${filterActive ? "matches" : "most recent"}`}
+        description={`${total.toLocaleString()} ${filterActive ? (total === 1 ? "match" : "matches") : "charges, newest first"}`}
         actions={
           <>
             <BulkGenerateButton />
@@ -116,6 +125,7 @@ export default async function ChargesPage({
             action={!filterActive && <Button asChild><Link href="/charges/new">New Charge</Link></Button>}
           />
         )}
+        <Pager path="/charges" params={sp} page={page} total={total} />
       </DataCard>
     </div>
   );
