@@ -149,11 +149,11 @@ export async function twelveMonthSummary(year: number, associationId = DEFAULT_A
 
   const [charges, receipts, bills, billPayments, cashEntries, accounts] = await Promise.all([
     db.charge.findMany({
-      where: { associationId, voided: false, isOpeningBalance: false, date: { gte: from, lte: to } },
+      where: { associationId, voided: false, isOpeningBalance: false, kind: { not: "REFUND" }, date: { gte: from, lte: to } },
       select: { date: true, amount: true },
     }),
     db.receipt.findMany({
-      where: { associationId, voided: false, isOpeningBalance: false, date: { gte: from, lte: to } },
+      where: { associationId, voided: false, isOpeningBalance: false, method: { not: "CREDIT_NOTE" }, date: { gte: from, lte: to } },
       select: { date: true, amount: true },
     }),
     db.bill.findMany({
@@ -161,7 +161,7 @@ export async function twelveMonthSummary(year: number, associationId = DEFAULT_A
       select: { date: true, amount: true },
     }),
     db.billPayment.findMany({
-      where: { bill: { associationId }, date: { gte: from, lte: to } },
+      where: { bill: { associationId }, method: { not: "DEBIT_NOTE" }, date: { gte: from, lte: to } },
       select: { date: true, amount: true },
     }),
     db.cashEntry.findMany({

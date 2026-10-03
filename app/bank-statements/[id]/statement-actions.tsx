@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { toast } from "sonner";
 import {
-  autoMatchStatement, deleteBankStatement, enterBankCharges, reopenBankStatement, signOffStatement,
+  autoMatchStatement, deleteBankStatement, reopenBankStatement, signOffStatement,
 } from "../actions";
 
 type Result<T = unknown> = { ok: true; data?: T } | { ok: false; error: string };
@@ -17,13 +17,12 @@ const orThrow = async <T,>(p: Promise<Result<T>>) => {
 };
 
 export function StatementActions({
-  statementId, reconciled, canSignOff, unmatched, charges,
+  statementId, reconciled, canSignOff, unmatched,
 }: {
   statementId: string;
   reconciled: boolean;
   canSignOff: boolean;
   unmatched: number;
-  charges: number;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -51,12 +50,6 @@ export function StatementActions({
         <Button variant="outline" disabled={pending}
           onClick={() => run(() => autoMatchStatement(statementId), (n) => `${n ?? 0} line(s) matched`)}>
           Match automatically
-        </Button>
-      )}
-      {charges > 0 && (
-        <Button variant="outline" disabled={pending}
-          onClick={() => run(() => enterBankCharges(statementId), (n) => `${n ?? 0} bank charge(s) entered`)}>
-          Enter {charges} bank charge{charges === 1 ? "" : "s"}
         </Button>
       )}
       <ConfirmButton

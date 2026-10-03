@@ -8,7 +8,9 @@ import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { controlAccount } from "@/lib/control-accounts";
 import { prepareEntry } from "@/lib/journal";
 import { requirePosting } from "@/lib/permissions";
-import { postBillPayment } from "@/lib/bill-posting";
+import { recordAudit } from "@/lib/audit";
+import { postBillPayment, postSupplierPayment, supplierPaymentSchema } from "@/lib/bill-posting";
+import { postSupplierDebitNote, supplierDebitNoteSchema } from "@/lib/notes";
 import { releaseLineFor } from "@/lib/bank-statement/service";
 import { attempt } from "@/lib/action-server";
 
@@ -21,6 +23,7 @@ const billSchema = z.object({
   amount: z.string(),
   expenseAccountId: z.string().min(1),
   description: z.string().optional(),
+  kind: z.enum(["BILL", "CREDIT_NOTE"]).default("BILL"),
 });
 
 export type BillInput = z.infer<typeof billSchema>;
@@ -67,6 +70,7 @@ export async function createBill(input: BillInput) {
           amount: amount.toFixed(2),
           expenseAccountId: expense.id,
           status: "UNPAID",
+          kind: data.kind,
           entryId: entry.id,
         },
       });
@@ -127,14 +131,17 @@ export async function voidBill(id: string, reason: string) {
   });
 }
 
+/** Voids a whole payment voucher: every bill it settled goes back to owing that amount. */
 export async function voidBillPayment(paymentId: string, reason: string) {
   return attempt(async () => {
     await requirePosting();
+    if (!reason.trim()) throw new Error("A reason is required to void");
     const payment = await db.billPayment.findUnique({ where: { id: paymentId } });
     if (!payment) throw new Error("Not found");
-    await releaseLineFor("billPayment", paymentId);
-    const bill = await db.bill.findUnique({ where: { id: payment.billId } });
-    if (!bill) throw new Error("Bill missing");
+    const rows = payment.entryId
+      ? await db.billPayment.findMany({ where: { entryId: payment.entryId } })
+      : [payment];
+    await releaseLineFor("billPayment", payment.entryId ?? payment.id);
 
     await db.$transaction(async (tx) => {
       if (payment.entryId) {
@@ -162,13 +169,40 @@ export async function voidBillPayment(paymentId: string, reason: string) {
           await tx.journalEntry.update({ where: { id: entry.id }, data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason } });
         }
       }
-      const newPaid = new Decimal(bill.paid.toString()).minus(new Decimal(payment.amount.toString()));
-      const billAmount = new Decimal(bill.amount.toString());
-      const newStatus = newPaid.lte(0) ? "UNPAID" : newPaid.gte(billAmount) ? "PAID" : "PARTIAL";
-      await tx.bill.update({ where: { id: bill.id }, data: { paid: newPaid.toFixed(2), status: newStatus } });
-      await tx.billPayment.delete({ where: { id: paymentId } });
+      for (const row of rows) {
+        const bill = await tx.bill.findUniqueOrThrow({ where: { id: row.billId } });
+        const newPaid = new Decimal(bill.paid.toString()).minus(row.amount.toString());
+        const newStatus = newPaid.lte(0) ? "UNPAID" : newPaid.gte(bill.amount.toString()) ? "PAID" : "PARTIAL";
+        await tx.bill.update({ where: { id: bill.id }, data: { paid: newPaid.toFixed(2), status: newStatus } });
+        await tx.billPayment.delete({ where: { id: row.id } });
+      }
+    });
+    await recordAudit("billPayment", payment.entryId ?? payment.id, "void", {
+      before: { voucherNo: payment.voucherNo, bills: rows.length, reason },
     });
     revalidatePath("/bills");
-    revalidatePath(`/bills/${bill.id}`);
+    for (const row of rows) revalidatePath(`/bills/${row.billId}`);
+  });
+}
+
+/** Pays one or more of a supplier's bills with one voucher. */
+export async function paySupplier(input: z.infer<typeof supplierPaymentSchema>) {
+  return attempt(async () => {
+    await requirePosting();
+    const result = await postSupplierPayment(input);
+    revalidatePath("/bills");
+    revalidatePath("/bank-statements");
+    return result;
+  });
+}
+
+/** Our debit note to a supplier, reducing what we owe on one bill. */
+export async function addSupplierDebitNote(input: z.infer<typeof supplierDebitNoteSchema>) {
+  return attempt(async () => {
+    await requirePosting();
+    const res = await postSupplierDebitNote(input);
+    revalidatePath(`/bills/${input.billId}`);
+    revalidatePath("/bills");
+    return res;
   });
 }

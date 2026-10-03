@@ -27,7 +27,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   });
   if (!statement) notFound();
 
-  const [rec, items, residents, accounts, user] = await Promise.all([
+  const [rec, items, residents, user] = await Promise.all([
     reconciliation(id),
     bookItems(statement.associationId),
     db.resident.findMany({
@@ -35,18 +35,12 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
       select: { id: true, debtorCode: true, unitAddress: true, ownerName: true },
       orderBy: { debtorCode: "asc" },
     }),
-    db.account.findMany({
-      where: { associationId: DEFAULT_ASSOCIATION_ID, active: true, type: { in: ["INCOME", "EXPENSE"] } },
-      select: { id: true, code: true, name: true, type: true },
-      orderBy: { code: "asc" },
-    }),
     getCurrentUser(),
   ]);
 
   const locked = !!statement.reconciledAt || !user || !canPost(user.role);
   const byKey = new Map(items.map((i) => [`${i.kind}:${i.id}`, i]));
   const free = items.filter((i) => !i.line);
-  const bankCharges = accounts.find((a) => a.code.startsWith("90B1"));
 
   const lines: (LineView & { date: Date; details: string; serial: string | null; debit: number; credit: number; balance: number })[] =
     statement.lines.map((l) => {
@@ -76,7 +70,6 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
     hint: r.debtorCode ?? undefined,
   }));
   const unmatchedHere = lines.filter((l) => !l.matched && l.noEntry === null);
-  const chargesHere = unmatchedHere.filter((l) => l.isCharge).length;
   const matchedHere = lines.length - unmatchedHere.length;
 
   return (
@@ -97,7 +90,6 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
                 reconciled={!!statement.reconciledAt}
                 canSignOff={rec.canSignOff}
                 unmatched={unmatchedHere.length}
-                charges={chargesHere}
               />
             )}
           </div>
@@ -137,9 +129,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
                     <LineActions
                       line={l}
                       residents={residentOptions}
-                      accounts={accounts}
                       locked={locked}
-                      bankChargesAccountId={bankCharges?.id ?? null}
                     />
                   </TableCell>
                 </TableRow>

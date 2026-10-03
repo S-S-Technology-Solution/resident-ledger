@@ -31,7 +31,7 @@ export default async function SalesReportPage({
   const charges = await db.charge.findMany({
     where: {
       associationId: DEFAULT_ASSOCIATION_ID,
-      voided: false,
+      voided: false, kind: { not: "REFUND" },
       isOpeningBalance: false,
       ...(fromDate || toDate
         ? { date: { ...(fromDate && { gte: fromDate }), ...(toDate && { lte: toDate }) } }

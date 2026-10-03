@@ -28,7 +28,7 @@ export default async function CreditorPaymentsPage({
 
   const payments = await db.billPayment.findMany({
     where: {
-      bill: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "VOIDED" } },
+      bill: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "VOIDED" } }, method: { not: "DEBIT_NOTE" },
       ...(fromDate || toDate
         ? { date: { ...(fromDate && { gte: fromDate }), ...(toDate && { lte: toDate }) } }
         : {}),

@@ -46,17 +46,18 @@ export default async function CashBookPage({
   );
 
   // For each line, resolve payee/counterparty by looking up the source row.
-  const billPaymentIds = linesInRange
-    .filter((l) => l.entry.source === "billpayment" && l.entry.sourceId)
-    .map((l) => l.entry.sourceId as string);
+  // Supplier payment vouchers are found by their journal entry (one voucher may pay several bills).
+  const billPaymentEntryIds = linesInRange
+    .filter((l) => l.entry.source === "billpayment")
+    .map((l) => l.entryId);
   const receiptIds = linesInRange
     .filter((l) => l.entry.source === "receipt" && l.entry.sourceId)
     .map((l) => l.entry.sourceId as string);
 
   const [billPayments, receipts] = await Promise.all([
-    billPaymentIds.length
+    billPaymentEntryIds.length
       ? db.billPayment.findMany({
-          where: { id: { in: billPaymentIds } },
+          where: { entryId: { in: billPaymentEntryIds } },
           include: { bill: { include: { supplier: true } } },
         })
       : Promise.resolve([]),
@@ -67,7 +68,7 @@ export default async function CashBookPage({
         })
       : Promise.resolve([]),
   ]);
-  const bpMap = new Map(billPayments.map((p) => [p.id, p]));
+  const bpMap = new Map(billPayments.map((p) => [p.entryId, p]));
   const rcMap = new Map(receipts.map((r) => [r.id, r]));
 
   const sorted = [...linesInRange].sort(
@@ -83,11 +84,11 @@ export default async function CashBookPage({
     running = running.plus(debit).minus(credit);
     let payee = "—";
     let voucher = l.entry.entryNo;
-    if (l.entry.source === "billpayment" && l.entry.sourceId) {
-      const bp = bpMap.get(l.entry.sourceId);
+    if (l.entry.source === "billpayment") {
+      const bp = bpMap.get(l.entryId);
       if (bp) {
         payee = bp.bill.supplier.name;
-        voucher = bp.bankRef || bp.bill.invoiceNo || l.entry.entryNo;
+        voucher = bp.voucherNo || bp.bankRef || bp.bill.invoiceNo || l.entry.entryNo;
       }
     } else if (l.entry.source === "receipt" && l.entry.sourceId) {
       const r = rcMap.get(l.entry.sourceId);

@@ -41,12 +41,16 @@ export function batchDescription(group: BatchGroup, year: number, month: number)
 export function groupForSource(source: string): BatchGroup {
   switch (source) {
     case "charge":
+    case "debitnote":
+    case "creditnote":
       return "SALES";
     case "bill":
+    case "supplierdebitnote":
       return "PURCHASE";
     case "receipt":
     case "billpayment":
     case "cash":
+    case "refund":
       return "BANK";
     default:
       return "JOURNAL";

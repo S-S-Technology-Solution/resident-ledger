@@ -66,7 +66,7 @@ export async function dashboardStats() {
         .slice(0, 5),
     ),
     db.receipt.findMany({
-      where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false },
+      where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false, method: { not: "CREDIT_NOTE" } },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       take: 5,
       include: { resident: true },

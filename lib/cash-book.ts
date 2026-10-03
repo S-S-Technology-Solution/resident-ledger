@@ -4,7 +4,7 @@ import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { prepareEntry } from "./journal";
 import { paymentMethodAccount } from "./control-accounts";
-import { nextNumber } from "./numbering";
+import { nextNumber, numberInUse } from "./numbering";
 import { releaseLineFor } from "./bank-statement/service";
 
 /**
@@ -22,38 +22,73 @@ export async function nextCashRefNo(
   return nextNumber(direction === "IN" ? "CASH_IN" : "CASH_OUT", date, associationId);
 }
 
+export type CashLineInput = { accountId: string; description?: string; amount: string };
+
 export type CashEntryInput = {
   direction: CashDirection;
   date: string;
-  amount: string;
   description: string;
-  accountId: string;
   counterparty?: string;
+  paymentFor?: string;
   method: string;
   bankRef?: string;
   chequeNo?: string;
+  // The number from the voucher book; left out, the next in sequence is used.
+  refNo?: string;
+  // Several account lines (a voucher split across expenses), or the single
+  // accountId/amount pair for a one-line entry.
+  lines?: CashLineInput[];
+  accountId?: string;
+  amount?: string;
 };
 
 export async function createCashEntry(
   input: CashEntryInput,
   associationId = DEFAULT_ASSOCIATION_ID,
 ) {
-  const amount = new Decimal(input.amount);
-  if (amount.lte(0)) throw new Error("Amount must be greater than zero");
+  const rawLines = input.lines?.length
+    ? input.lines
+    : input.accountId && input.amount ? [{ accountId: input.accountId, amount: input.amount, description: "" }] : [];
+  if (!rawLines.length) throw new Error("Add at least one account line.");
+  const lines = rawLines.map((l, i) => {
+    const amount = new Decimal(l.amount || 0);
+    if (amount.lte(0)) throw new Error(`Line ${i + 1}: the amount must be greater than zero.`);
+    return { ...l, amount };
+  });
+  const amount = lines.reduce((s, l) => s.plus(l.amount), new Decimal(0));
 
-  const account = await db.account.findUnique({ where: { id: input.accountId } });
-  if (!account) throw new Error("Account not found");
-  if (account.type === "ASSET" && account.code.startsWith("3300")) {
-    throw new Error("Pick the income or expense account — the bank or cash side is set by the method.");
+  const accounts = await db.account.findMany({ where: { id: { in: lines.map((l) => l.accountId) } } });
+  const byId = new Map(accounts.map((a) => [a.id, a]));
+  for (const [i, l] of lines.entries()) {
+    const account = byId.get(l.accountId);
+    if (!account) throw new Error(`Line ${i + 1}: pick an account.`);
+    if (account.type === "ASSET" && account.code.startsWith("3300")) {
+      throw new Error(`Line ${i + 1}: pick the income or expense account — the bank or cash side is set by the method.`);
+    }
   }
 
   const date = new Date(input.date);
+  const key = input.direction === "IN" ? "CASH_IN" : "CASH_OUT";
+  let refNo = input.refNo?.replace(/\s+/g, "").toUpperCase();
+  if (refNo) {
+    if (await numberInUse(key, refNo, associationId)) {
+      throw new Error(`${refNo} is already in the system. Check the number in the voucher book.`);
+    }
+  } else {
+    refNo = await nextCashRefNo(input.direction, date, associationId);
+  }
   const bankOrCash = await paymentMethodAccount(input.method === "CASH" ? "CASH" : "BANK");
   const { entryNo, batchId } = await prepareEntry(date, "cash");
-  const refNo = await nextCashRefNo(input.direction, date, associationId);
   const isIn = input.direction === "IN";
 
   return db.$transaction(async (tx) => {
+    const bankLine = { accountId: bankOrCash.id, debit: isIn ? amount.toFixed(2) : "0", credit: isIn ? "0" : amount.toFixed(2) };
+    const accountLines = lines.map((l) => ({
+      accountId: l.accountId,
+      debit: isIn ? "0" : l.amount.toFixed(2),
+      credit: isIn ? l.amount.toFixed(2) : "0",
+      memo: l.description || null,
+    }));
     const entry = await tx.journalEntry.create({
       data: {
         associationId,
@@ -66,15 +101,7 @@ export async function createCashEntry(
         source: "cash",
         postedAt: new Date(),
         lines: {
-          create: isIn
-            ? [
-                { accountId: bankOrCash.id, debit: amount.toFixed(2), credit: "0", lineNo: 1 },
-                { accountId: account.id, debit: "0", credit: amount.toFixed(2), lineNo: 2 },
-              ]
-            : [
-                { accountId: account.id, debit: amount.toFixed(2), credit: "0", lineNo: 1 },
-                { accountId: bankOrCash.id, debit: "0", credit: amount.toFixed(2), lineNo: 2 },
-              ],
+          create: (isIn ? [bankLine, ...accountLines] : [...accountLines, bankLine]).map((l, i) => ({ ...l, lineNo: i + 1 })),
         },
       },
     });
@@ -82,17 +109,23 @@ export async function createCashEntry(
     const cash = await tx.cashEntry.create({
       data: {
         associationId,
-        refNo,
+        refNo: refNo!,
         direction: input.direction,
         date,
         amount: amount.toFixed(2),
         description: input.description,
         counterparty: input.counterparty || null,
+        paymentFor: input.paymentFor || null,
         method: input.method,
         bankRef: input.bankRef || null,
         chequeNo: input.chequeNo || null,
-        accountId: account.id,
+        accountId: lines[0].accountId,
         entryId: entry.id,
+        lines: {
+          create: lines.map((l, i) => ({
+            lineNo: i + 1, accountId: l.accountId, description: l.description ?? "", amount: l.amount.toFixed(2),
+          })),
+        },
       },
     });
 

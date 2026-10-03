@@ -17,6 +17,9 @@ import { Empty } from "@/components/empty";
 import { VoidChargeButton } from "@/app/charges/void-charge-button";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { NotesMenu } from "./notes-menu";
+import { controlAccountCodes } from "@/lib/control-accounts";
+import { nextNumber } from "@/lib/numbering";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +45,21 @@ export default async function ResidentDetailPage({ params }: { params: Promise<{
     take: 50,
   });
 
+  // For the Adjust menu: income accounts, the fee account as the default, and
+  // how far the resident is in credit (paid more than charged) for refunds.
+  const [incomeAccounts, feeCode, charged, paid] = await Promise.all([
+    db.account.findMany({
+      where: { associationId: resident.associationId, active: true, type: "INCOME" },
+      orderBy: { code: "asc" },
+      select: { id: true, code: true, name: true },
+    }),
+    controlAccountCodes(resident.associationId),
+    db.charge.aggregate({ where: { residentId: id, voided: false }, _sum: { amount: true } }),
+    db.receipt.aggregate({ where: { residentId: id, voided: false }, _sum: { amount: true } }),
+  ]);
+  const credit = Number(paid._sum.amount ?? 0) - Number(charged._sum.amount ?? 0);
+  const feeAccountId = incomeAccounts.find((a) => a.code === feeCode.INCOME_FEE)?.id ?? "";
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -51,6 +69,12 @@ export default async function ResidentDetailPage({ params }: { params: Promise<{
           <div className="no-print flex gap-2">
             <Button asChild variant="outline"><Link href={`/residents/${id}/statement`}>Statement</Link></Button>
             <Writable><Button asChild variant="outline"><Link href={`/charges/new?residentId=${id}`}>Add Charge</Link></Button></Writable>
+            <Writable>
+              <NotesMenu
+                residentId={id} accounts={incomeAccounts} feeAccountId={feeAccountId}
+                credit={credit > 0 ? credit : 0} suggestedVoucherNo={await nextNumber("CASH_OUT", new Date())}
+              />
+            </Writable>
             <Writable><Button asChild><Link href={`/receipts/new?residentId=${id}`}>Take Payment</Link></Button></Writable>
           </div>
         }

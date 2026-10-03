@@ -13,7 +13,9 @@ export { SEQUENCE_RESETS, stemFor, type SequenceConfig, type SequenceReset };
  * touches this screen sees no change.
  */
 
-export type SequenceKey = "INVOICE" | "RECEIPT" | "JOURNAL" | "CASH_IN" | "CASH_OUT";
+export type SequenceKey =
+  | "INVOICE" | "RECEIPT" | "JOURNAL" | "CASH_IN" | "CASH_OUT"
+  | "DEBIT_NOTE" | "CREDIT_NOTE" | "SUPPLIER_DN";
 
 export const SEQUENCE_DEFAULTS: Record<SequenceKey, SequenceConfig> = {
   INVOICE: { prefix: "", padding: 3, reset: "MONTHLY", startAt: 1 },
@@ -21,6 +23,9 @@ export const SEQUENCE_DEFAULTS: Record<SequenceKey, SequenceConfig> = {
   JOURNAL: { prefix: "JE-", padding: 5, reset: "YEARLY", startAt: 1 },
   CASH_IN: { prefix: "CR-", padding: 2, reset: "MONTHLY", startAt: 1 },
   CASH_OUT: { prefix: "PV-", padding: 2, reset: "MONTHLY", startAt: 1 },
+  DEBIT_NOTE: { prefix: "DN-", padding: 2, reset: "MONTHLY", startAt: 1 },
+  CREDIT_NOTE: { prefix: "CN-", padding: 2, reset: "MONTHLY", startAt: 1 },
+  SUPPLIER_DN: { prefix: "SDN-", padding: 2, reset: "MONTHLY", startAt: 1 },
 };
 
 function toConfig(row: { prefix: string; padding: number; reset: string; startAt: number }): SequenceConfig {
@@ -34,6 +39,9 @@ export const SEQUENCE_LABEL: Record<SequenceKey, string> = {
   JOURNAL: "Journal entry",
   CASH_IN: "Cash book receipt",
   CASH_OUT: "Payment voucher",
+  DEBIT_NOTE: "Debit note (resident)",
+  CREDIT_NOTE: "Credit note (resident)",
+  SUPPLIER_DN: "Debit note (supplier)",
 };
 
 export const SEQUENCE_KEYS = Object.keys(SEQUENCE_DEFAULTS) as SequenceKey[];
@@ -62,14 +70,37 @@ export async function getAllSequenceConfigs(associationId = DEFAULT_ASSOCIATION_
   });
 }
 
-/** Tables that carry a document number, and the column it lives in. */
-const NUMBERED = {
-  INVOICE: { table: "Charge", column: "invoiceNo" },
-  RECEIPT: { table: "Receipt", column: "receiptNo" },
-  JOURNAL: { table: "JournalEntry", column: "entryNo" },
-  CASH_IN: { table: "CashEntry", column: "refNo" },
-  CASH_OUT: { table: "CashEntry", column: "refNo" },
-} as const satisfies Record<SequenceKey, { table: string; column: string }>;
+/**
+ * Where each document number is stored. Payment vouchers come from one book
+ * whether they pay a sundry expense, a supplier or a resident refund, so their
+ * numbers are looked up across all three. Bill payments carry no association of
+ * their own and are reached through their bill.
+ */
+type Source = { from: string; column: string; assoc: string };
+const own = (table: string, column: string): Source => ({ from: `"${table}" t`, column: `t."${column}"`, assoc: `t."associationId"` });
+const viaBill = (column: string): Source => ({ from: `"BillPayment" t JOIN "Bill" b ON b.id = t."billId"`, column: `t."${column}"`, assoc: `b."associationId"` });
+
+const NUMBERED: Record<SequenceKey, Source[]> = {
+  INVOICE: [own("Charge", "invoiceNo")],
+  RECEIPT: [own("Receipt", "receiptNo")],
+  JOURNAL: [own("JournalEntry", "entryNo")],
+  CASH_IN: [own("CashEntry", "refNo")],
+  CASH_OUT: [own("CashEntry", "refNo"), viaBill("voucherNo"), own("Charge", "voucherNo")],
+  DEBIT_NOTE: [own("Charge", "invoiceNo")],
+  CREDIT_NOTE: [own("Receipt", "receiptNo")],
+  SUPPLIER_DN: [viaBill("voucherNo")],
+};
+
+/** Whether a number (e.g. one written in a voucher book) is already used for this document type. */
+export async function numberInUse(key: SequenceKey, no: string, associationId = DEFAULT_ASSOCIATION_ID) {
+  for (const src of NUMBERED[key]) {
+    const rows = await db.$queryRawUnsafe<unknown[]>(
+      `SELECT 1 FROM ${src.from} WHERE ${src.assoc} = $1 AND ${src.column} = $2 LIMIT 1`, associationId, no,
+    );
+    if (rows.length) return true;
+  }
+  return false;
+}
 
 /**
  * Highest number already issued under a stem.
@@ -79,14 +110,14 @@ const NUMBERED = {
  * because a running sequence outgrows its width: A10000 comes after A9999.
  */
 async function highestIssued(key: SequenceKey, stem: string, associationId: string) {
-  const { table, column } = NUMBERED[key];
   const like = stem.replace(/[\\%_]/g, (c) => `\\${c}`) + "%";
+  const union = NUMBERED[key]
+    .map((src) => `SELECT ${src.column} AS no FROM ${src.from}
+      WHERE ${src.assoc} = $1 AND ${src.column} LIKE $2
+        AND substring(${src.column} from $3::int) ~ '^[0-9]+$'`)
+    .join("\n      UNION ALL\n      ");
   const rows = await db.$queryRawUnsafe<{ no: string }[]>(
-    `SELECT "${column}" AS no FROM "${table}"
-      WHERE "associationId" = $1 AND "${column}" LIKE $2
-        AND substring("${column}" from $3::int) ~ '^[0-9]+$'
-      ORDER BY length("${column}") DESC, "${column}" DESC
-      LIMIT 1`,
+    `SELECT no FROM (${union}) x ORDER BY length(no) DESC, no DESC LIMIT 1`,
     associationId, like, stem.length + 1,
   );
   return rows[0]?.no ?? null;

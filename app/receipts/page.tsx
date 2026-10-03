@@ -29,6 +29,7 @@ export default async function ReceiptsPage({
   const page = pageFrom(sp.page);
   const where = {
     associationId: DEFAULT_ASSOCIATION_ID,
+    method: { not: "CREDIT_NOTE" },
     ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
     ...(q ? {
       OR: [

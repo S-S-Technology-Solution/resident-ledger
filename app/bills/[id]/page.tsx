@@ -10,10 +10,11 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
-import { PayBillButton } from "./pay-bill-button";
 import { VoidBillButton } from "./void-bill-button";
 import { VoidPaymentButton } from "./void-payment-button";
+import { DebitNoteButton } from "./debit-note-button";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
 
@@ -54,7 +55,12 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
         actions={
           <div className="no-print flex gap-2 items-center">
             {statusBadge}
-            {bill.status !== "VOIDED" && bill.status !== "PAID" && <Writable><PayBillButton billId={bill.id} open={open.toFixed(2)} /></Writable>}
+            {bill.status !== "VOIDED" && bill.status !== "PAID" && (
+              <Writable>
+                <DebitNoteButton billId={bill.id} open={Number(open)} />
+                <Button asChild><Link href={`/bills/pay?supplierId=${bill.supplierId}&billId=${bill.id}`}>Pay</Link></Button>
+              </Writable>
+            )}
             {bill.status !== "VOIDED" && bill.payments.length === 0 && <Writable><VoidBillButton id={bill.id} /></Writable>}
           </div>
         }
@@ -78,8 +84,9 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
+                <TableHead>Voucher</TableHead>
+                <TableHead>Cheque</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Bank Ref</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -87,8 +94,12 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
               {bill.payments.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>{format(p.date, "dd MMM yyyy")}</TableCell>
+                  <TableCell className="font-mono">
+                    {p.entryId ? <Link href={`/bills/voucher/${p.entryId}`} className="underline-offset-2 hover:underline">{p.voucherNo ?? "—"}</Link> : (p.voucherNo ?? "—")}
+                    {p.method === "DEBIT_NOTE" && <span className="ml-2 text-xs text-muted-foreground">debit note</span>}
+                  </TableCell>
+                  <TableCell className="font-mono">{p.chequeNo ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono tabular">{fmtRM(p.amount)}</TableCell>
-                  <TableCell>{p.bankRef ?? "—"}</TableCell>
                   <TableCell className="text-right space-x-2">
                     {p.method === "BANK" && bill.status !== "VOIDED" && (
                       <Link href={`/cheque/bill/${p.id}`} className="text-sm text-primary hover:underline">

@@ -8,8 +8,8 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CashEntryDialog } from "./entry-dialog";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
@@ -25,22 +25,17 @@ export default async function CashBookPage({
   const sp = await searchParams;
   const page = pageFrom(sp.page);
   const where = { associationId: DEFAULT_ASSOCIATION_ID };
-  const [entries, total, sums, accounts] = await Promise.all([
+  const [entries, total, sums] = await Promise.all([
     db.cashEntry.findMany({
       where,
       orderBy: [{ date: "desc" }, { refNo: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { account: { select: { code: true, name: true } } },
+      include: { account: { select: { code: true, name: true } }, _count: { select: { lines: true } } },
     }),
     db.cashEntry.count({ where }),
     // Totals cover the whole cash book, not just the page on screen.
     db.cashEntry.groupBy({ by: ["direction"], where: { ...where, voided: false }, _sum: { amount: true } }),
-    db.account.findMany({
-      where: { associationId: DEFAULT_ASSOCIATION_ID, active: true, type: { in: ["INCOME", "EXPENSE"] } },
-      orderBy: { code: "asc" },
-      select: { id: true, code: true, name: true, type: true },
-    }),
   ]);
 
   const sumOf = (d: "IN" | "OUT") => Number(sums.find((s) => s.direction === d)?._sum.amount ?? 0);
@@ -54,8 +49,8 @@ export default async function CashBookPage({
         description="Receipts and payments with no resident or supplier behind them"
         actions={
           <>
-            <Writable><CashEntryDialog direction="IN" accounts={accounts} /></Writable>
-            <Writable><CashEntryDialog direction="OUT" accounts={accounts} /></Writable>
+            <Writable><Button asChild><Link href="/cash-book/new?direction=IN">New receipt</Link></Button></Writable>
+            <Writable><Button asChild variant="outline"><Link href="/cash-book/new?direction=OUT">New payment voucher</Link></Button></Writable>
           </>
         }
       />
@@ -95,7 +90,7 @@ export default async function CashBookPage({
                 </TableCell>
                 <TableCell className="whitespace-normal text-muted-foreground">
                   <div className="font-mono text-xs">{e.account.code}</div>
-                  <div className="text-xs">{e.account.name}</div>
+                  <div className="text-xs">{e.account.name}{e._count.lines > 1 ? ` + ${e._count.lines - 1} more` : ""}</div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{e.method}</TableCell>
                 <TableCell className="text-right font-mono tabular">

@@ -268,6 +268,17 @@ model Charge {
   // its own — the GL side comes from the single opening-balance entry, so posting
   // these individually would double-count prior-year income.
   isOpeningBalance Boolean  @default(false)
+  // FEE (monthly fee), DEBIT_NOTE (extra charge; credits creditAccountId), or
+  // REFUND (money paid back to the resident from creditAccountId, a bank or
+  // cash account, by voucher — it appears in bank reconciliation).
+  kind          String      @default("FEE")
+  creditAccountId String?
+  method        String?
+  voucherNo     String?
+  chequeNo      String?
+  cleared       Boolean     @default(false)
+  clearedAt     DateTime?
+  statementRef  String?
   createdAt     DateTime    @default(now())
 
   allocations PaymentAllocation[]
@@ -290,6 +301,9 @@ model Receipt {
   // As written on the Official Receipt: who paid (may differ from the owner),
   // the months the payment covers ("YYYY-MM"), and the cheque number if any.
   receivedFrom  String?
+  // Credit notes (method CREDIT_NOTE) reduce what a resident owes without money
+  // changing hands; this is the account debited instead of the bank.
+  contraAccountId String?
   periodFrom    String?
   periodTo      String?
   chequeNo      String?
@@ -352,6 +366,8 @@ model Bill {
   entryId          String?
   // Creditor balance brought forward — see Charge.isOpeningBalance.
   isOpeningBalance Boolean     @default(false)
+  // BILL, or CREDIT_NOTE for a supplier's credit note that adds to what we owe.
+  kind             String      @default("BILL")
   createdAt        DateTime    @default(now())
 
   payments BillPayment[]
@@ -367,10 +383,20 @@ model BillPayment {
   amount       Decimal   @db.Decimal(15, 2)
   method       String    @default("BANK")
   bankRef      String?
+  // One payment voucher can settle several bills: its rows share entryId and
+  // voucherNo, and the bank sees one cheque for the total.
+  voucherNo    String?
+  chequeNo     String?
+  paymentFor   String?
+  // DEBIT_NOTE method: our debit note to the supplier, reducing the bill; the
+  // amount goes back to this account instead of leaving the bank.
+  contraAccountId String?
   entryId      String?
   cleared      Boolean   @default(false)
   clearedAt    DateTime?
   statementRef String?
+
+  @@index([entryId])
 }
 
 // Cash book: money in or out that is not tied to a resident or supplier —
@@ -386,9 +412,11 @@ model CashEntry {
   amount        Decimal       @db.Decimal(15, 2)
   description   String
   counterparty  String?
+  paymentFor    String?
   method        String        @default("BANK")
   bankRef       String?
   chequeNo      String?
+  // First line's account, kept for lists; the full split is in lines.
   accountId     String
   account       Account       @relation(fields: [accountId], references: [id])
   entryId       String?
@@ -399,8 +427,23 @@ model CashEntry {
   voidReason    String?
   createdAt     DateTime      @default(now())
 
+  lines CashEntryLine[]
+
   @@unique([associationId, refNo])
   @@index([associationId, date])
+}
+
+// One line of a payment voucher or cash book receipt: which account, how much.
+model CashEntryLine {
+  id          String    @id @default(cuid())
+  cashEntryId String
+  cashEntry   CashEntry @relation(fields: [cashEntryId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  accountId   String
+  description String    @default("")
+  amount      Decimal   @db.Decimal(15, 2)
+
+  @@index([cashEntryId])
 }
 
 model AuditLog {

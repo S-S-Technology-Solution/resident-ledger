@@ -37,7 +37,7 @@ export default async function PaymentHistoryPage({
   const receipts = residentId
     ? await db.receipt.findMany({
         where: {
-          residentId,
+          residentId, method: { not: "CREDIT_NOTE" },
           ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
         },
         orderBy: { date: "asc" },

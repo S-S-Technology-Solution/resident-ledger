@@ -41,7 +41,7 @@ export default async function RemittanceAdvicePage({
   const payments = supplier
     ? await db.billPayment.findMany({
         where: {
-          bill: { supplierId: supplier.id, associationId: DEFAULT_ASSOCIATION_ID },
+          bill: { supplierId: supplier.id, associationId: DEFAULT_ASSOCIATION_ID }, method: { not: "DEBIT_NOTE" },
           ...(fromDate || toDate
             ? { date: { ...(fromDate && { gte: fromDate }), ...(toDate && { lte: toDate }) } }
             : {}),

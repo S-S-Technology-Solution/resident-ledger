@@ -10,6 +10,7 @@ import { requirePosting } from "@/lib/permissions";
 import { postCharge, type ChargeInput } from "@/lib/charge-posting";
 import { generateMonthlyFees } from "@/lib/monthly-fees";
 import { attempt } from "@/lib/action-server";
+import { releaseLineFor } from "@/lib/bank-statement/service";
 
 export type { ChargeInput } from "@/lib/charge-posting";
 
@@ -49,6 +50,7 @@ export async function voidCharge(id: string, reason: string) {
     });
     if (!charge) throw new Error("Not found");
     if (charge.voided) throw new Error("Already voided");
+    if (charge.kind === "REFUND") await releaseLineFor("refund", id);
     const allocated = charge.allocations
       .filter((a) => !a.receipt.voided)
       .reduce((s, a) => s.plus(new Decimal(a.amount.toString())), new Decimal(0));

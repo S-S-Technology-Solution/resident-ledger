@@ -23,6 +23,7 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
   if (!receipt) notFound();
   const association = await getAssociation();
   const amt = Number(receipt.amount);
+  if (receipt.method === "CREDIT_NOTE") return <CreditNote receipt={receipt} associationName={association.name} />;
 
   // "In Payment Of": the months written on the receipt, or else the months it settled.
   const periods = receipt.allocations
@@ -144,6 +145,67 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
         </div>
 
         {receipt.voided && <div className="void-watermark" />}
+      </article>
+    </div>
+  );
+}
+
+/** A resident credit note: no money changed hands, so it is not an Official Receipt. */
+function CreditNote({ receipt, associationName }: {
+  receipt: { receiptNo: string; date: Date; amount: unknown; receivedFrom: string | null; voided: boolean; voidReason: string | null;
+    resident: { ownerName: string; unitAddress: string };
+    allocations: { id: string; amount: unknown; charge: { description: string; periodYear: number; periodMonth: number } }[] };
+  associationName: string;
+}) {
+  const amt = Number(receipt.amount);
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between no-print">
+        <div>
+          <h1 className="text-2xl font-semibold">Credit note {receipt.receiptNo}</h1>
+          {receipt.voided && <Badge variant="destructive">VOIDED — {receipt.voidReason}</Badge>}
+        </div>
+        <div className="flex gap-2"><PrintButton /></div>
+      </div>
+      <article className="print-receipt mx-auto max-w-3xl rounded-lg border bg-card p-8 shadow-sm">
+        <header className="flex items-start justify-between border-b pb-4">
+          <div className="text-lg font-semibold uppercase">{associationName}</div>
+          <div className="text-right">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">Credit Note</div>
+            <div className="font-mono text-xl font-bold">{receipt.receiptNo}</div>
+            <div className="text-sm">{format(receipt.date, "dd MMM yyyy")}</div>
+          </div>
+        </header>
+        <div className="grid grid-cols-2 gap-6 py-5">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">To</div>
+            <div className="font-semibold">{receipt.resident.ownerName}</div>
+            <div className="text-sm text-muted-foreground">{receipt.resident.unitAddress}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Amount credited</div>
+            <div className="font-mono text-3xl font-bold tabular">RM {fmtRM(amt)}</div>
+            <div className="text-sm">{ringgitInWords(amt)}</div>
+          </div>
+        </div>
+        <p className="text-sm"><span className="text-muted-foreground">Reason:</span> {receipt.receivedFrom}</p>
+        {receipt.allocations.length > 0 && (
+          <table className="mt-4 w-full text-sm">
+            <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-1.5 font-medium">Charge reduced</th><th className="py-1.5 font-medium">Period</th><th className="py-1.5 text-right font-medium">Amount</th></tr></thead>
+            <tbody>
+              {receipt.allocations.map((a) => (
+                <tr key={a.id} className="border-b last:border-0">
+                  <td className="py-1.5">{a.charge.description}</td>
+                  <td className="py-1.5">{a.charge.periodYear}-{String(a.charge.periodMonth).padStart(2, "0")}</td>
+                  <td className="py-1.5 text-right font-mono tabular">{fmtRM(Number(a.amount))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <footer className="mt-12 flex justify-end text-xs text-muted-foreground">
+          <div className="w-48 text-center"><div className="h-10 border-b border-dashed" /><div className="mt-1 font-medium text-foreground/80">Treasurer</div></div>
+        </footer>
       </article>
     </div>
   );

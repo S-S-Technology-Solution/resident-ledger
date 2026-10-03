@@ -5,7 +5,7 @@ import { controlAccount } from "../control-accounts";
 import type { ParsedStatement } from "./rhb";
 import { candidatesFor, guessResident, type BookItem } from "./match";
 
-export type MatchKind = "receipt" | "billPayment" | "cashEntry";
+export type MatchKind = "receipt" | "billPayment" | "cashEntry" | "refund";
 const NO_ENTRY = "none";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -99,7 +99,7 @@ async function openingBookBalance(associationId = DEFAULT_ASSOCIATION_ID) {
  */
 export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includeVoided = false } = {}) {
   const voided = includeVoided ? {} : { voided: false };
-  const [receipts, payments, cash, matched] = await Promise.all([
+  const [receipts, payments, cash, refunds, matched] = await Promise.all([
     db.receipt.findMany({
       where: { associationId, method: "BANK", ...voided, isOpeningBalance: false },
       include: { resident: { select: { ownerName: true, unitAddress: true } } },
@@ -109,13 +109,18 @@ export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includ
       include: { bill: { select: { invoiceNo: true, supplier: { select: { name: true } } } } },
     }),
     db.cashEntry.findMany({ where: { associationId, method: "BANK", ...voided } }),
+    // Money paid back to residents by voucher leaves the bank like any payment.
+    db.charge.findMany({
+      where: { associationId, kind: "REFUND", method: "BANK", ...voided },
+      include: { resident: { select: { ownerName: true, unitAddress: true } } },
+    }),
     db.bankStatementLine.findMany({
-      where: { matchKind: { in: ["receipt", "billPayment", "cashEntry"] }, statement: { associationId } },
+      where: { matchKind: { in: ["receipt", "billPayment", "cashEntry", "refund"] }, statement: { associationId } },
       select: { matchKind: true, matchId: true, date: true, ref: true },
     }),
   ]);
   const lineFor = new Map(matched.map((m) => [`${m.matchKind}:${m.matchId}`, m]));
-  const voidedEntryIds = [...receipts, ...cash].filter((x) => x.voided && x.entryId).map((x) => x.entryId!);
+  const voidedEntryIds = [...receipts, ...cash, ...refunds].filter((x) => x.voided && x.entryId).map((x) => x.entryId!);
   const reversals = voidedEntryIds.length
     ? await db.journalEntry.findMany({ where: { reversesId: { in: voidedEntryIds } }, select: { reversesId: true, date: true } })
     : [];
@@ -129,10 +134,19 @@ export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includ
       ref: r.receiptNo, label: `${r.resident.ownerName} — ${r.resident.unitAddress}`,
       bankRef: r.bankRef, chequeNo: null, residentId: r.residentId, href: `/receipts/${r.id}`, voidedOn: voidedOn(r),
     })),
-    ...payments.map((p) => ({
-      kind: "billPayment" as const, id: p.id, date: p.date, amount: Number(p.amount), direction: "OUT" as const,
-      ref: p.bill.invoiceNo, label: p.bill.supplier.name, bankRef: p.bankRef, chequeNo: p.bankRef,
-      href: `/bills/${p.billId}`, voidedOn: null,
+    // A voucher paying several bills is one cheque: one item for its total.
+    ...[...Map.groupBy(payments, (p) => p.entryId ?? p.id).entries()].map(([id, rows]) => ({
+      kind: "billPayment" as const, id, date: rows[0].date,
+      amount: rows.reduce((s, p) => s + Number(p.amount), 0), direction: "OUT" as const,
+      ref: rows[0].voucherNo ?? rows[0].bill.invoiceNo,
+      label: `${rows[0].bill.supplier.name} — ${rows.map((p) => p.bill.invoiceNo).join(", ")}`,
+      bankRef: rows[0].bankRef, chequeNo: rows[0].chequeNo ?? rows[0].bankRef,
+      href: rows[0].entryId ? `/bills/voucher/${rows[0].entryId}` : `/bills/${rows[0].billId}`, voidedOn: null,
+    })),
+    ...refunds.map((r) => ({
+      kind: "refund" as const, id: r.id, date: r.date, amount: Number(r.amount), direction: "OUT" as const,
+      ref: r.voucherNo ?? r.invoiceNo ?? "Refund", label: `Refund — ${r.resident.ownerName}, ${r.resident.unitAddress}`,
+      bankRef: null, chequeNo: r.chequeNo, residentId: r.residentId, href: `/charges/${r.id}`, voidedOn: voidedOn(r),
     })),
     ...cash.map((c) => ({
       kind: "cashEntry" as const, id: c.id, date: c.date, amount: Number(c.amount), direction: c.direction,
@@ -155,7 +169,9 @@ async function assertEditable(lineId: string) {
 async function setCleared(kind: MatchKind, id: string, line: { date: Date; ref: string } | null) {
   const data = { cleared: line !== null, clearedAt: line?.date ?? null, statementRef: line?.ref ?? null };
   if (kind === "receipt") await db.receipt.update({ where: { id }, data });
-  else if (kind === "billPayment") await db.billPayment.update({ where: { id }, data });
+  // Bill payments are matched per voucher (its journal entry), covering every bill it paid.
+  else if (kind === "billPayment") await db.billPayment.updateMany({ where: { OR: [{ entryId: id }, { id }] }, data });
+  else if (kind === "refund") await db.charge.update({ where: { id }, data });
   else await db.cashEntry.update({ where: { id }, data });
 }
 

@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { requirePosting } from "@/lib/permissions";
 import { attempt } from "@/lib/action-server";
+import { creditNoteSchema, debitNoteSchema, postCreditNote, postDebitNote, postRefund, refundSchema } from "@/lib/notes";
 
 const schema = z.object({
   id: z.string().optional(),
@@ -51,5 +52,34 @@ export async function toggleResident(id: string, active: boolean) {
     await requirePosting();
     await db.resident.update({ where: { id }, data: { active } });
     revalidatePath("/residents");
+  });
+}
+
+export async function addDebitNote(input: z.infer<typeof debitNoteSchema>) {
+  return attempt(async () => {
+    await requirePosting();
+    const res = await postDebitNote(input);
+    revalidatePath(`/residents/${input.residentId}`);
+    revalidatePath("/charges");
+    return res;
+  });
+}
+
+export async function addCreditNote(input: z.infer<typeof creditNoteSchema>) {
+  return attempt(async () => {
+    await requirePosting();
+    const res = await postCreditNote(input);
+    revalidatePath(`/residents/${input.residentId}`);
+    return res;
+  });
+}
+
+export async function addRefund(input: z.infer<typeof refundSchema>) {
+  return attempt(async () => {
+    await requirePosting();
+    const res = await postRefund(input);
+    revalidatePath(`/residents/${input.residentId}`);
+    revalidatePath("/bank-statements");
+    return res;
   });
 }

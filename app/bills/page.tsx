@@ -67,7 +67,7 @@ export default async function BillsPage({
       <PageHeader
         title="Bills"
         description={`${total.toLocaleString()} ${status ? `· ${status.toLowerCase()}` : ""}${filterActive ? " · filtered" : ""}`}
-        actions={<Writable><Button asChild><Link href="/bills/new">New Bill</Link></Button></Writable>}
+        actions={<Writable><div className="flex gap-2"><Button asChild variant="outline"><Link href="/bills/pay">Pay supplier</Link></Button><Button asChild><Link href="/bills/new">New Bill</Link></Button></div></Writable>}
       />
 
       <form className="flex flex-wrap items-end gap-3">

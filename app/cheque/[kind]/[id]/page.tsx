@@ -34,10 +34,12 @@ export default async function ChequePage({
       include: { bill: { include: { supplier: true } } },
     });
     if (!payment) notFound();
+    // One cheque pays the whole voucher, which may cover several bills.
+    const rows = payment.entryId ? await db.billPayment.findMany({ where: { entryId: payment.entryId } }) : [payment];
     payee = payment.bill.supplier.name;
-    amount = Number(payment.amount);
+    amount = rows.reduce((s, r) => s + Number(r.amount), 0);
     date = payment.date;
-    reference = payment.bill.invoiceNo;
+    reference = payment.voucherNo ?? payment.bill.invoiceNo;
   } else if (kind === "cash") {
     const entry = await db.cashEntry.findUnique({ where: { id } });
     if (!entry || entry.direction !== "OUT") notFound();

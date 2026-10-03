@@ -37,7 +37,7 @@ export default async function InvoiceListingPage({
   const today = new Date();
 
   const charges = await db.charge.findMany({
-    where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false },
+    where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false, kind: { not: "REFUND" } },
     include: {
       resident: { select: { id: true, debtorCode: true, unitAddress: true, ownerName: true } },
       allocations: { include: { receipt: { select: { voided: true } } } },

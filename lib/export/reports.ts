@@ -359,7 +359,7 @@ export async function paymentHistory(residentId: string, r: Range): Promise<Repo
   if (!resident) throw new Error("Resident not found");
   const receipts = await db.receipt.findMany({
     where: {
-      residentId,
+      residentId, method: { not: "CREDIT_NOTE" },
       ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
     },
     orderBy: { date: "asc" },
@@ -492,7 +492,7 @@ export async function invoiceListing(r: Range & { view?: string }): Promise<Repo
   const view = r.view === "paid" ? "paid" : r.view === "due" ? "due" : "unpaid";
   const today = new Date();
   const charges = await db.charge.findMany({
-    where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false },
+    where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false, kind: { not: "REFUND" } },
     include: {
       resident: { select: { debtorCode: true, unitAddress: true, ownerName: true } },
       allocations: { include: { receipt: { select: { voided: true } } } },
@@ -599,7 +599,7 @@ export async function salesReport(r: Range): Promise<ReportData> {
   const range = parseRange(r);
   const charges = await db.charge.findMany({
     where: {
-      associationId: DEFAULT_ASSOCIATION_ID, voided: false, isOpeningBalance: false,
+      associationId: DEFAULT_ASSOCIATION_ID, voided: false, isOpeningBalance: false, kind: { not: "REFUND" },
       ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
     },
     include: {
@@ -653,7 +653,7 @@ export async function creditorPayments(r: Range): Promise<ReportData> {
   const range = parseRange(r);
   const payments = await db.billPayment.findMany({
     where: {
-      bill: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "VOIDED" } },
+      bill: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "VOIDED" } }, method: { not: "DEBIT_NOTE" },
       ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
     },
     include: { bill: { include: { supplier: true } } },

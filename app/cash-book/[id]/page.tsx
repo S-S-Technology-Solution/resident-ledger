@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { db } from "@/lib/db";
 import { getAssociation } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
-import { amountInWords } from "@/lib/receipts";
+import { ringgitInWords as amountInWords } from "@/lib/receipts";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/app/receipts/[id]/print-button";
 import Link from "next/link";
@@ -19,11 +19,20 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const entry = await db.cashEntry.findUnique({
     where: { id },
-    include: { account: true },
+    include: { account: true, lines: { orderBy: { lineNo: "asc" } } },
   });
   if (!entry) notFound();
 
   const association = await getAssociation();
+  // Entries made before vouchers had lines carry their single account on the entry itself.
+  const lineAccounts = await db.account.findMany({
+    where: { id: { in: entry.lines.map((l) => l.accountId) } },
+    select: { id: true, code: true, name: true },
+  });
+  const acc = new Map(lineAccounts.map((a) => [a.id, a]));
+  const lines = entry.lines.length
+    ? entry.lines.map((l) => ({ id: l.id, code: acc.get(l.accountId)?.code ?? "", name: acc.get(l.accountId)?.name ?? "", description: l.description, amount: Number(l.amount) }))
+    : [{ id: "single", code: entry.account.code, name: entry.account.name, description: "", amount: Number(entry.amount) }];
   const amt = Number(entry.amount);
   const isIn = entry.direction === "IN";
   const title = isIn ? "Receipt" : "Payment Voucher";
@@ -94,7 +103,7 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
         <div className="grid grid-cols-1 gap-6 px-8 py-6 sm:grid-cols-2">
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {isIn ? "Received from" : "Paid to"}
+              {isIn ? "Paid by" : "Pay to"}
             </div>
             <div className="mt-1 text-base font-semibold">{entry.counterparty || "—"}</div>
           </div>
@@ -109,24 +118,44 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
           <div className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
             {isIn ? "Being receipt for" : "Being payment for"}
           </div>
-          <p className="text-sm">{entry.description}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Posted to <span className="font-mono">{entry.account.code}</span> — {entry.account.name}
-          </p>
+          <p className="text-sm font-medium">{entry.description}</p>
+          {entry.paymentFor && <p className="text-sm text-muted-foreground">{entry.paymentFor}</p>}
+          <table className="mt-3 w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="py-1.5 font-medium">A/C No.</th>
+                <th className="py-1.5 font-medium">A/C Description</th>
+                <th className="py-1.5 font-medium">Description</th>
+                <th className="py-1.5 text-right font-medium">Amount (RM)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l) => (
+                <tr key={l.id} className="border-b last:border-0">
+                  <td className="py-1.5 font-mono text-xs">{l.code}</td>
+                  <td className="py-1.5">{l.name}</td>
+                  <td className="py-1.5 text-muted-foreground">{l.description}</td>
+                  <td className="py-1.5 text-right font-mono tabular">{fmtRM(l.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3} className="pt-2 text-right text-xs font-medium">Total</td>
+                <td className="pt-2 text-right font-mono font-semibold tabular">{fmtRM(amt)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
 
-        <footer className="flex justify-between px-8 pb-8 pt-12 text-xs text-muted-foreground">
-          <div>
-            <div className="h-10 w-44 border-b border-dashed" />
-            <div className="mt-1 font-medium text-foreground/80">
-              {isIn ? "Received by" : "Approved by"}
+        <footer className="grid grid-cols-3 gap-6 px-8 pb-8 pt-12 text-xs text-muted-foreground">
+          {(isIn ? ["Received by", "Checked by", "Treasurer"] : ["Prepared by", "Approved by", "Received by"]).map((who) => (
+            <div key={who}>
+              <div className="h-10 border-b border-dashed" />
+              <div className="mt-1 font-medium text-foreground/80">{who}</div>
+              {who === "Received by" && !isIn && <div className="mt-0.5 text-[10px]">Name / IC / Date</div>}
             </div>
-          </div>
-          <div className="text-right">
-            <div className="italic text-foreground/70">Computer Generated</div>
-            <div className="mt-1 font-medium text-foreground/80">Treasurer</div>
-            <div className="mt-0.5 text-[10px]">{association.name}</div>
-          </div>
+          ))}
         </footer>
 
         {entry.voided && <div className="void-watermark" />}
