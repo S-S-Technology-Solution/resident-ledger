@@ -20,6 +20,15 @@ export const receiptSchema = z.object({
   method: z.enum(["CASH", "BANK"]),
   bankRef: z.string().optional(),
   allocations: z.array(allocationSchema).default([]),
+  // The number printed in the Official Receipt Book. Left out, the next number
+  // in the receipt sequence is used (e.g. a receipt taken from a bank statement).
+  receiptNo: z.string().trim().optional(),
+  receivedFrom: z.string().trim().optional(),
+  periodFrom: z.string().regex(/^\d{4}-\d{2}$/, "Pick the first month paid for").optional(),
+  periodTo: z.string().regex(/^\d{4}-\d{2}$/, "Pick the last month paid for").optional(),
+  chequeNo: z.string().trim().optional(),
+}).refine((d) => !d.periodFrom || !d.periodTo || d.periodFrom <= d.periodTo, {
+  message: "The first month paid for must not be after the last.",
 });
 
 export type ReceiptInput = z.infer<typeof receiptSchema>;
@@ -48,7 +57,10 @@ export async function postReceipt(input: ReceiptInput) {
   const ar = await controlAccount("AR");
   const cashOrBank = await paymentMethodAccount(data.method);
   const { entryNo, batchId } = await prepareEntry(new Date(data.date), "receipt");
-  const receiptNo = await nextReceiptNo();
+  // "A 1004" as written in the book is stored as A1004, like the numbers the system issues.
+  const receiptNo = data.receiptNo ? data.receiptNo.replace(/\s+/g, "").toUpperCase() : await nextReceiptNo();
+  const clash = await db.receipt.findFirst({ where: { associationId: DEFAULT_ASSOCIATION_ID, receiptNo }, select: { id: true } });
+  if (clash) throw new Error(`Receipt ${receiptNo} is already in the system. Check the number in the receipt book.`);
 
   const receipt = await db.$transaction(async (tx) => {
     const entry = await tx.journalEntry.create({
@@ -79,6 +91,10 @@ export async function postReceipt(input: ReceiptInput) {
         amount: amount.toFixed(2),
         method: data.method,
         bankRef: data.bankRef,
+        receivedFrom: data.receivedFrom || null,
+        periodFrom: data.periodFrom || null,
+        periodTo: data.periodTo || null,
+        chequeNo: data.chequeNo || null,
         entryId: entry.id,
         allocations: { create: allocations.map((a) => ({ chargeId: a.chargeId, amount: a.amount.toFixed(2) })) },
       },

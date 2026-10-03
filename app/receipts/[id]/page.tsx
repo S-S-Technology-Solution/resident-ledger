@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { db } from "@/lib/db";
 import { getAssociation } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
-import { amountInWords } from "@/lib/receipts";
+import { ringgitInWords } from "@/lib/receipts";
 import { Badge } from "@/components/ui/badge";
 import { VoidReceiptButton } from "./void-receipt-button";
 import { PrintButton } from "./print-button";
@@ -24,19 +24,27 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
   const association = await getAssociation();
   const amt = Number(receipt.amount);
 
+  // "In Payment Of": the months written on the receipt, or else the months it settled.
+  const periods = receipt.allocations
+    .map((a) => `${a.charge.periodYear}-${String(a.charge.periodMonth).padStart(2, "0")}`)
+    .sort();
+  const fromMonth = receipt.periodFrom ?? periods[0] ?? null;
+  const toMonth = receipt.periodTo ?? periods.at(-1) ?? null;
+  const monthLabel = (ym: string | null) => (ym ? format(new Date(`${ym}-01T00:00:00`), "MMM yyyy") : "");
+  const [prefix, digits] = (receipt.receiptNo.match(/^([A-Z]*)(.*)$/) ?? ["", "", receipt.receiptNo]).slice(1);
+
   return (
     <div className="space-y-4">
       <style>{`
         @media print {
-          @page { size: A5 portrait; margin: 8mm; }
-          html, body { font-size: 11px; }
-          .print-receipt { max-width: none !important; border-radius: 0 !important; }
-          .print-receipt > header { padding: 12px 16px !important; }
-          .print-receipt > header .h-14 { height: 2.25rem !important; width: 2.25rem !important; font-size: 0.625rem !important; letter-spacing: -0.02em; }
-          .print-receipt section, .print-receipt > div { padding: 10px 16px !important; }
-          .print-receipt table { font-size: 10px !important; }
-          .print-receipt h1, .print-receipt h2 { font-size: 1rem !important; }
+          @page { size: A5 landscape; margin: 6mm; }
+          .print-receipt { max-width: none !important; box-shadow: none !important; }
         }
+        .or { --or-ink: #157347; --or-fill: #e3f4ec; --or-line: #3a9a6a; font-family: "Times New Roman", Times, Georgia, serif; }
+        .or-box { border: 1.5px solid var(--or-line); border-radius: 8px; }
+        .or-lab { font-size: 11px; line-height: 1.15; color: var(--or-ink); }
+        .or-lab i { font-style: italic; }
+        .or-hand { font-family: ui-sans-serif, system-ui, sans-serif; color: #1f3a8a; }
       `}</style>
       <div className="flex items-center justify-between no-print">
         <div>
@@ -54,103 +62,85 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
-      <article className="print-receipt relative mx-auto max-w-3xl rounded-lg border bg-card shadow-sm overflow-hidden">
-        {/* Letterhead */}
-        <header className="relative bg-gradient-to-r from-emerald-700 to-emerald-800 px-8 py-6 text-emerald-50 print:bg-white print:bg-none print:text-emerald-800">
-          <div className="flex items-start gap-4">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-white/15 text-sm font-black tracking-tight ring-1 ring-white/30 print:bg-emerald-100 print:text-emerald-800 print:ring-emerald-300">
-              {association.name
-                .split(/\s+/)
-                .filter((w) => /^[A-Z]/.test(w))
-                .map((w) => w[0])
-                .join("") || "R"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-lg font-semibold leading-tight">{association.name}</div>
-              {association.registrationNo && (
-                <div className="text-xs text-emerald-100/90 mt-0.5 print:text-emerald-700">Reg. No: {association.registrationNo}</div>
-              )}
-              {association.address && (
-                <div className="text-xs text-emerald-100/90 mt-0.5 whitespace-pre-line print:text-emerald-700">{association.address}</div>
-              )}
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-xs uppercase tracking-widest text-emerald-100/80 print:text-emerald-700">Official Receipt</div>
-              <div className="mt-1 font-mono text-xl font-bold print:text-emerald-800">{receipt.receiptNo}</div>
-            </div>
+      {/* Laid out like the association's printed Official Receipt Book. */}
+      <article className="or print-receipt relative mx-auto max-w-4xl overflow-hidden rounded-md border bg-[var(--or-fill)] p-6 shadow-sm">
+        <header>
+          <div className="text-[26px] font-bold uppercase leading-none tracking-tight text-[var(--or-ink)]">
+            {association.name}
           </div>
+          {association.registrationNo && (
+            <div className="mt-1 text-[11px] text-[var(--or-ink)]">{association.registrationNo}</div>
+          )}
         </header>
 
-        {/* Meta strip */}
-        <div className="grid grid-cols-2 gap-4 border-b bg-emerald-50/40 px-8 py-4 text-sm sm:grid-cols-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Date</div>
-            <div className="font-medium">{format(receipt.date, "dd MMM yyyy")}</div>
+        <div className="mt-3 grid grid-cols-[1.4fr_1fr_1fr] gap-2">
+          <div className="or-box px-3 py-1.5 text-center leading-tight text-[var(--or-ink)]">
+            <div className="text-2xl font-bold tracking-wide">RESIT RASMI</div>
+            <div className="text-xl italic">Official Receipt</div>
           </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Method</div>
-            <div className="font-medium">{receipt.method === "BANK" ? "Bank Transfer" : "Cash"}</div>
+          <div className="or-box px-3 py-1.5">
+            <div className="or-lab">TARIKH / <i>Date</i> 日期</div>
+            <div className="or-hand mt-1 text-lg">{format(receipt.date, "d-M-yyyy")}</div>
           </div>
-          <div className="col-span-2">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Reference</div>
-            <div className="font-medium font-mono">{receipt.bankRef || "—"}</div>
-          </div>
-        </div>
-
-        {/* Resident + Amount */}
-        <div className="grid grid-cols-1 gap-6 px-8 py-6 sm:grid-cols-2">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Received from</div>
-            <div className="mt-1 text-base font-semibold">{receipt.resident.ownerName}</div>
-            <div className="text-sm text-muted-foreground">{receipt.resident.unitAddress}</div>
-          </div>
-          <div className="sm:text-right">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Amount</div>
-            <div className="mt-1 font-mono text-4xl font-bold text-emerald-800 tabular">RM {fmtRM(amt)}</div>
-            <div className="mt-1 text-sm font-medium text-foreground/80">{amountInWords(amt)}</div>
+          <div className="or-box px-3 py-1.5">
+            <div className="or-lab font-bold">RESIT NO. / <i>Receipt No.</i> 号码</div>
+            <div className="mt-1 flex items-baseline gap-2 text-[var(--or-ink)]">
+              <span className="text-xl font-bold">No: {prefix}</span>
+              <span className="font-mono text-2xl tracking-wider text-red-700">{digits}</span>
+            </div>
           </div>
         </div>
 
-        {/* Allocations */}
-        <div className="border-t px-8 py-5">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Being payment for</div>
-          {receipt.allocations.length === 0 ? (
-            <p className="text-sm italic text-muted-foreground">Unapplied payment — held as credit on account</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="py-2 font-medium">Description</th>
-                  <th className="py-2 font-medium">Period</th>
-                  <th className="py-2 font-medium text-right">Applied</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receipt.allocations.map((a) => (
-                  <tr key={a.id} className="border-b last:border-0">
-                    <td className="py-2">{a.charge.description}</td>
-                    <td className="py-2 text-muted-foreground">
-                      {a.charge.periodYear}-{String(a.charge.periodMonth).padStart(2, "0")}
-                    </td>
-                    <td className="py-2 text-right font-mono tabular">{fmtRM(a.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <div className="or-box mt-2 divide-y divide-[var(--or-line)]">
+          <div className="grid grid-cols-[9rem_1fr_auto] items-end gap-3 px-3 py-2">
+            <div className="or-lab">Diterima Dari<br /><i>Received From</i> 兹收</div>
+            <div className="or-hand text-lg">{receipt.receivedFrom || receipt.resident.ownerName}</div>
+            <div className="or-hand text-lg">{receipt.resident.unitAddress}</div>
+          </div>
+          <div className="grid grid-cols-[9rem_1fr] items-end gap-3 px-3 py-2">
+            <div className="or-lab">Wang Yang Diterima<br /><i>The Sum Of Ringgit</i> 来银</div>
+            <div className="or-hand text-lg">{ringgitInWords(amt)}</div>
+          </div>
+          <div className="h-8" />
+          <div className="grid grid-cols-[9rem_1fr] items-end gap-3 px-3 py-2">
+            <div className="or-lab">Untuk Bayaran<br /><i>In Payment Of</i> 付还</div>
+            <div className="text-lg text-[var(--or-ink)]">
+              Security Fee for the month of{" "}
+              <span className="or-hand inline-block min-w-28 border-b border-[var(--or-line)] text-center">{monthLabel(fromMonth)}</span>
+              {" "}to{" "}
+              <span className="or-hand inline-block min-w-28 border-b border-[var(--or-line)] text-center">{monthLabel(toMonth)}</span>
+            </div>
+          </div>
         </div>
 
-        {/* Treasurer block — no manual signature required */}
-        <footer className="flex justify-end px-8 pt-12 pb-8 text-xs text-muted-foreground">
-          <div className="text-right">
-            <div className="italic text-foreground/70">Computer Generated</div>
-            <div className="mt-1 font-medium text-foreground/80">Treasurer</div>
-            <div className="mt-0.5 text-[10px]">{association.name}</div>
+        <div className="mt-2 grid grid-cols-[1fr_1.8fr] gap-3">
+          <div className="space-y-1.5">
+            <div className="or-box flex items-baseline gap-2 px-3 py-2 text-[var(--or-ink)]">
+              <span className="text-xl">RM</span>
+              <span className="or-hand text-xl tabular">{fmtRM(amt)}</span>
+            </div>
+            <div className="or-box divide-y divide-[var(--or-line)] text-sm">
+              <div className="flex gap-2 px-3 py-1">
+                <span className="or-lab">Bank / Cash</span>
+                <span className="or-hand">{receipt.method === "BANK" ? "Bank" : "Cash"}{receipt.bankRef ? ` · ${receipt.bankRef}` : ""}</span>
+              </div>
+              <div className="flex gap-2 px-3 py-1">
+                <span className="or-lab">Cheque No.</span>
+                <span className="or-hand">{receipt.chequeNo ?? ""}</span>
+              </div>
+            </div>
           </div>
-        </footer>
+          <div className="or-box flex flex-col justify-between px-3 py-2">
+            <div className="text-center text-xl text-[var(--or-ink)]">Treasurer</div>
+            <div className="mt-6 flex items-end justify-between gap-3">
+              <span className="or-lab">Yang Menerima / Issued By / 发据人</span>
+              <span className="rounded-sm bg-[#c7ebd9] px-2 py-1 text-xs text-[var(--or-ink)]">{association.name}</span>
+            </div>
+          </div>
+        </div>
 
-        <div className="border-t bg-muted/40 px-8 py-2 text-center text-[10px] uppercase tracking-widest text-muted-foreground">
-          Computer-generated · Valid without physical seal
+        <div className="mt-2 text-center text-[10px] uppercase tracking-widest text-[var(--or-ink)]/70">
+          Computer-generated receipt
         </div>
 
         {receipt.voided && <div className="void-watermark" />}

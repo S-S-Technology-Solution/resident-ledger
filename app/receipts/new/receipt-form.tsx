@@ -22,10 +22,12 @@ export function ReceiptForm({
   residents,
   defaultResidentId,
   initialOpen,
+  suggestedReceiptNo,
 }: {
   residents: ResidentOpt[];
   defaultResidentId?: string;
   initialOpen: Charge[];
+  suggestedReceiptNo: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -35,6 +37,18 @@ export function ReceiptForm({
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"CASH" | "BANK">("BANK");
   const [bankRef, setBankRef] = useState("");
+  const [receiptNo, setReceiptNo] = useState(suggestedReceiptNo);
+  const ownerOf = (id: string) => residents.find((r) => r.id === id)?.ownerName ?? "";
+  const [receivedFrom, setReceivedFrom] = useState(defaultResidentId ? ownerOf(defaultResidentId) : "");
+  const [periodFrom, setPeriodFrom] = useState("");
+  const [periodTo, setPeriodTo] = useState("");
+  const [chequeNo, setChequeNo] = useState("");
+
+  // "Received From" starts as the owner but is whoever actually paid, as written on the receipt.
+  function pickResident(id: string) {
+    if (!receivedFrom || receivedFrom === ownerOf(residentId)) setReceivedFrom(ownerOf(id));
+    setResidentId(id);
+  }
   const [open, setOpen] = useState<Charge[]>(initialOpen);
   const [allocs, setAllocs] = useState<Record<string, string>>({});
 
@@ -71,18 +85,36 @@ export function ReceiptForm({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="r-no">Receipt no.</Label>
+          <Input id="r-no" className="font-mono" value={receiptNo} onChange={(e) => setReceiptNo(e.target.value)} />
+          <p className="text-xs text-muted-foreground">As printed in the Official Receipt Book</p>
+        </div>
+        <div className="space-y-1">
+          <Label>Date</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="hidden sm:block" />
         <div className="space-y-1 sm:col-span-2">
-          <Label>Resident</Label>
+          <Label>Unit</Label>
           <Combobox
             value={residentId}
-            onChange={setResidentId}
+            onChange={pickResident}
             placeholder="Search resident…"
             options={residents.map((r) => ({ value: r.id, label: r.unitAddress, hint: r.ownerName }))}
           />
         </div>
         <div className="space-y-1">
-          <Label>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Label htmlFor="r-from">Received from</Label>
+          <Input id="r-from" value={receivedFrom} onChange={(e) => setReceivedFrom(e.target.value)} placeholder="Name of the payer" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="r-pf">Security fee from (month)</Label>
+          <Input id="r-pf" type="month" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="r-pt">To (month)</Label>
+          <Input id="r-pt" type="month" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} />
         </div>
         <div className="space-y-1">
           <Label>Amount (RM)</Label>
@@ -97,6 +129,10 @@ export function ReceiptForm({
               <SelectItem value="CASH">Cash</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="r-chq">Cheque no. (if by cheque)</Label>
+          <Input id="r-chq" value={chequeNo} onChange={(e) => setChequeNo(e.target.value)} />
         </div>
         <div className="space-y-1">
           <Label>Bank reference (optional)</Label>
@@ -152,13 +188,18 @@ export function ReceiptForm({
 
       <div className="flex justify-end gap-2">
         <Button
-          disabled={pending || !residentId || !amount || remaining.lt(0)}
+          disabled={pending || !residentId || !amount || !receiptNo.trim() || remaining.lt(0)}
           onClick={() => start(async () => {
             try {
               const allocations = Object.entries(allocs)
                 .filter(([, v]) => new Decimal(v || 0).gt(0))
                 .map(([chargeId, v]) => ({ chargeId, amount: v }));
-              const r = await unwrap(createReceipt({ residentId, date, amount, method, bankRef: bankRef || undefined, allocations }));
+              const r = await unwrap(createReceipt({
+                residentId, date, amount, method, bankRef: bankRef || undefined, allocations,
+                receiptNo, receivedFrom: receivedFrom || undefined,
+                periodFrom: periodFrom || undefined, periodTo: periodTo || undefined,
+                chequeNo: chequeNo || undefined,
+              }));
               toast.success(`Receipt ${r.receiptNo} created`);
               router.push(`/receipts/${r.id}?print=1`);
             } catch (e) {

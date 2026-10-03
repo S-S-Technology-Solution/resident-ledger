@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ReceiptForm } from "./receipt-form";
 import { requireWrite } from "@/lib/screen-guard";
+import { nextReceiptNo } from "@/lib/receipts";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,12 @@ export default async function NewReceiptPage({
           </Button>
         }
       />
-      <ReceiptForm residents={residents} defaultResidentId={residentId} initialOpen={initialOpen} />
+      <ReceiptForm
+        residents={residents}
+        defaultResidentId={residentId}
+        initialOpen={initialOpen}
+        suggestedReceiptNo={await nextReceiptNo()}
+      />
     </div>
   );
 }

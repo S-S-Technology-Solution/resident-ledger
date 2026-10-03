@@ -287,6 +287,12 @@ model Receipt {
   amount        Decimal     @db.Decimal(15, 2)
   method        String
   bankRef       String?
+  // As written on the Official Receipt: who paid (may differ from the owner),
+  // the months the payment covers ("YYYY-MM"), and the cheque number if any.
+  receivedFrom  String?
+  periodFrom    String?
+  periodTo      String?
+  chequeNo      String?
   entryId       String?
   cleared       Boolean     @default(false)
   clearedAt     DateTime?
