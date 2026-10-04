@@ -7,8 +7,9 @@ import Decimal from "decimal.js";
 export async function nextEntryNo(
   associationId = DEFAULT_ASSOCIATION_ID,
   date: Date = new Date(),
+  key: "JOURNAL" | "SALES_JOURNAL" = "JOURNAL",
 ): Promise<string> {
-  return nextNumber("JOURNAL", date, associationId);
+  return nextNumber(key, date, associationId);
 }
 
 /**
@@ -22,8 +23,11 @@ export async function prepareEntry(
   associationId = DEFAULT_ASSOCIATION_ID,
 ): Promise<{ entryNo: string; batchId: string }> {
   await assertPeriodOpen(date, associationId);
-  const batch = await ensureBatch(groupForSource(source), date, associationId);
-  const entryNo = await nextEntryNo(associationId, date);
+  const group = groupForSource(source);
+  const batch = await ensureBatch(group, date, associationId);
+  // Sales postings (fees, debit and credit notes) are numbered in their own
+  // sales journal, SJ-2026-00001, apart from the general journal's JE- numbers.
+  const entryNo = await nextEntryNo(associationId, date, group === "SALES" ? "SALES_JOURNAL" : "JOURNAL");
   return { entryNo, batchId: batch.id };
 }
 

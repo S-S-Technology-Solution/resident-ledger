@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { DesktopSidebar } from "@/components/sidebar-nav";
 import { Topbar } from "@/components/topbar";
+import { BackButton } from "@/components/back-button";
 import { currentSession } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/permissions";
 import { clearSessionCookie } from "@/lib/auth";
@@ -44,7 +45,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <div className="flex min-w-0 flex-1 flex-col">
               <Topbar allowed={allowed} />
               <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
-                <div className="mx-auto w-full max-w-6xl">{children}</div>
+                <div className="mx-auto w-full max-w-6xl">
+                  <BackButton />
+                  {children}
+                </div>
               </main>
             </div>
           </div>
