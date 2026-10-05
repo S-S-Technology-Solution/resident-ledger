@@ -78,16 +78,21 @@ export async function getAllSequenceConfigs(associationId = DEFAULT_ASSOCIATION_
  * numbers are looked up across all three. Bill payments carry no association of
  * their own and are reached through their bill.
  */
-type Source = { from: string; column: string; assoc: string };
+type Source = { from: string; column: string; assoc: string; filter?: string };
 const own = (table: string, column: string): Source => ({ from: `"${table}" t`, column: `t."${column}"`, assoc: `t."associationId"` });
 const viaBill = (column: string): Source => ({ from: `"BillPayment" t JOIN "Bill" b ON b.id = t."billId"`, column: `t."${column}"`, assoc: `b."associationId"` });
+// Numbers held by drafts awaiting posting count as used.
+const draft = (filter: string): Source => ({ from: `"Draft" t`, column: `t."number"`, assoc: `t."associationId"`, filter });
 
 const NUMBERED: Record<SequenceKey, Source[]> = {
   INVOICE: [own("Charge", "invoiceNo")],
-  RECEIPT: [own("Receipt", "receiptNo")],
+  RECEIPT: [own("Receipt", "receiptNo"), draft(`t.kind = 'receipt'`)],
   JOURNAL: [own("JournalEntry", "entryNo")],
-  CASH_IN: [own("CashEntry", "refNo")],
-  CASH_OUT: [own("CashEntry", "refNo"), viaBill("voucherNo"), own("Charge", "voucherNo")],
+  CASH_IN: [own("CashEntry", "refNo"), draft(`t.kind = 'cashEntry' AND t.direction = 'IN'`)],
+  CASH_OUT: [
+    own("CashEntry", "refNo"), viaBill("voucherNo"), own("Charge", "voucherNo"),
+    draft(`(t.kind = 'cashEntry' AND t.direction = 'OUT') OR t.kind = 'supplierPayment'`),
+  ],
   DEBIT_NOTE: [own("Charge", "invoiceNo")],
   CREDIT_NOTE: [own("Receipt", "receiptNo")],
   SUPPLIER_DN: [viaBill("voucherNo")],
@@ -95,10 +100,15 @@ const NUMBERED: Record<SequenceKey, Source[]> = {
 };
 
 /** Whether a number (e.g. one written in a voucher book) is already used for this document type. */
-export async function numberInUse(key: SequenceKey, no: string, associationId = DEFAULT_ASSOCIATION_ID) {
+export async function numberInUse(
+  key: SequenceKey, no: string, associationId = DEFAULT_ASSOCIATION_ID, exceptDraftId?: string,
+) {
   for (const src of NUMBERED[key]) {
+    // A draft being edited may keep its own number.
+    const skipSelf = exceptDraftId && src.from.startsWith(`"Draft"`) ? ` AND t.id <> $3` : "";
     const rows = await db.$queryRawUnsafe<unknown[]>(
-      `SELECT 1 FROM ${src.from} WHERE ${src.assoc} = $1 AND ${src.column} = $2 LIMIT 1`, associationId, no,
+      `SELECT 1 FROM ${src.from} WHERE ${src.assoc} = $1 AND ${src.column} = $2${src.filter ? ` AND (${src.filter})` : ""}${skipSelf} LIMIT 1`,
+      associationId, no, ...(skipSelf ? [exceptDraftId] : []),
     );
     if (rows.length) return true;
   }
@@ -116,7 +126,7 @@ async function highestIssued(key: SequenceKey, stem: string, associationId: stri
   const like = stem.replace(/[\\%_]/g, (c) => `\\${c}`) + "%";
   const union = NUMBERED[key]
     .map((src) => `SELECT ${src.column} AS no FROM ${src.from}
-      WHERE ${src.assoc} = $1 AND ${src.column} LIKE $2
+      WHERE ${src.assoc} = $1 AND ${src.column} LIKE $2${src.filter ? ` AND (${src.filter})` : ""}
         AND substring(${src.column} from $3::int) ~ '^[0-9]+$'`)
     .join("\n      UNION ALL\n      ");
   const rows = await db.$queryRawUnsafe<{ no: string }[]>(

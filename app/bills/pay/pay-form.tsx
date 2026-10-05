@@ -12,28 +12,33 @@ import { toast } from "sonner";
 import { fmtRM } from "@/lib/money";
 import { unwrap } from "@/lib/action";
 import { paySupplier } from "../actions";
+import { updateDraft } from "@/app/drafts/actions";
+import type { SupplierPaymentInput } from "@/lib/bill-posting";
 
 type Bill = { id: string; supplierId: string; invoiceNo: string; date: string; open: string };
 
 export function PayForm({
-  suppliers, bills, defaultSupplierId, defaultBillId, suggestedVoucherNo,
+  suppliers, bills, defaultSupplierId, defaultBillId, suggestedVoucherNo, draftId, initial,
 }: {
   suppliers: { id: string; name: string }[];
   bills: Bill[];
   defaultSupplierId: string;
   defaultBillId?: string;
   suggestedVoucherNo: string;
+  draftId?: string;
+  initial?: Partial<SupplierPaymentInput>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [supplierId, setSupplierId] = useState(defaultSupplierId);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<"BANK" | "CASH">("BANK");
-  const [voucherNo, setVoucherNo] = useState(suggestedVoucherNo);
-  const [chequeNo, setChequeNo] = useState("");
-  const [bankRef, setBankRef] = useState("");
-  const [paymentFor, setPaymentFor] = useState("");
+  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? defaultSupplierId);
+  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
+  const [method, setMethod] = useState<"BANK" | "CASH">(initial?.method ?? "BANK");
+  const [voucherNo, setVoucherNo] = useState(initial?.voucherNo ?? suggestedVoucherNo);
+  const [chequeNo, setChequeNo] = useState(initial?.chequeNo ?? "");
+  const [bankRef, setBankRef] = useState(initial?.bankRef ?? "");
+  const [paymentFor, setPaymentFor] = useState(initial?.paymentFor ?? "");
   const [amounts, setAmounts] = useState<Record<string, string>>(() => {
+    if (initial?.allocations) return Object.fromEntries(initial.allocations.map((a) => [a.billId, a.amount]));
     const b = bills.find((x) => x.id === defaultBillId);
     return b ? { [b.id]: b.open } : {};
   });
@@ -45,13 +50,25 @@ export function PayForm({
   function submit() {
     start(async () => {
       try {
-        const res = await unwrap(paySupplier({
+        const input = {
           supplierId, date, method, voucherNo, chequeNo: chequeNo || undefined, bankRef: bankRef || undefined,
           paymentFor: paymentFor || undefined,
           allocations: open.filter((b) => new Decimal(amounts[b.id] || 0).gt(0)).map((b) => ({ billId: b.id, amount: amounts[b.id] })),
-        }));
-        toast.success(`Payment voucher ${res.voucherNo} saved — RM ${fmtRM(Number(res.total))}`);
-        router.push(`/bills/voucher/${res.entryId}`);
+        };
+        if (draftId) {
+          await unwrap(updateDraft(draftId, { kind: "supplierPayment", input }));
+          toast.success(`Draft ${voucherNo} updated`);
+          router.push(`/drafts/${draftId}`);
+          return;
+        }
+        const res = await unwrap(paySupplier(input));
+        if (res.draft) {
+          toast.success(`${res.voucherNo} saved as a draft — check it and post it from Drafts`);
+          router.push(`/drafts/${res.id}`);
+        } else {
+          toast.success(`Payment voucher ${res.voucherNo} saved — RM ${fmtRM(Number(res.total))}`);
+          router.push(`/bills/voucher/${res.id}`);
+        }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to save");
       }
@@ -132,7 +149,7 @@ export function PayForm({
 
       <div className="flex justify-end">
         <Button disabled={pending || !supplierId || !voucherNo.trim() || total.lte(0) || over} onClick={submit}>
-          {pending ? "Saving…" : "Save payment voucher"}
+          {pending ? "Saving…" : draftId ? "Save changes" : "Save payment voucher"}
         </Button>
       </div>
     </div>

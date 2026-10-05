@@ -17,6 +17,7 @@ type Initial = {
   currency: string;
   fiscalYearStart: number;
   lockedThrough: string;
+  draftsRequired: boolean;
 };
 
 const MONTHS = [
@@ -31,13 +32,14 @@ export function SettingsForm({ initial }: { initial: Initial }) {
   const [currency, setCurrency] = useState(initial.currency);
   const [fy, setFy] = useState(initial.fiscalYearStart);
   const [lockedThrough, setLocked] = useState(initial.lockedThrough);
+  const [draftsRequired, setDraftsRequired] = useState(initial.draftsRequired);
 
   function save() {
     start(async () => {
       try {
         await unwrap(saveSettings({
           name, registrationNo, address, currency,
-          fiscalYearStart: fy, lockedThrough: lockedThrough || undefined,
+          fiscalYearStart: fy, lockedThrough: lockedThrough || undefined, draftsRequired,
         }));
         toast.success("Settings saved");
       } catch (e) {
@@ -100,8 +102,27 @@ export function SettingsForm({ initial }: { initial: Initial }) {
           <div className="space-y-1">
             <Label htmlFor="locked">Books locked through</Label>
             <Input id="locked" type="date" value={lockedThrough} onChange={(e) => setLocked(e.target.value)} />
-            <p className="text-xs text-muted-foreground">Optional — not enforced yet; the value is stored for upcoming guards.</p>
+            <p className="text-xs text-muted-foreground">Nothing can be posted on or before this date. Signing off a bank statement moves it forward automatically.</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Checking before posting</CardTitle>
+          <p className="text-sm text-muted-foreground">Let the accountant check entries and amounts before they reach the accounts.</p>
+        </CardHeader>
+        <CardContent>
+          <label className="flex items-start gap-3 text-sm">
+            <input id="drafts" type="checkbox" className="mt-1 h-4 w-4" checked={draftsRequired} onChange={(e) => setDraftsRequired(e.target.checked)} />
+            <span>
+              <span className="font-medium">Save receipts and payments as drafts</span>
+              <span className="block text-muted-foreground">
+                Resident receipts, payment vouchers, cash book receipts and supplier payments are saved as drafts.
+                They don&rsquo;t affect any balance until someone posts them from the Drafts screen.
+              </span>
+            </span>
+          </label>
         </CardContent>
       </Card>
 

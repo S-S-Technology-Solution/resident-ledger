@@ -23,6 +23,7 @@ import {
   Upload,
   SlidersHorizontal,
   FileSpreadsheet,
+  FilePen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { screenForPath, type ScreenKey } from "@/lib/screens";
@@ -36,7 +37,13 @@ import {
 type Item = { href: string; label: string; screen: ScreenKey; icon: React.ComponentType<{ className?: string }> };
 
 const groups: { title: string; items: Item[] }[] = [
-  { title: "Overview", items: [{ href: "/", screen: "dashboard", label: "Dashboard", icon: LayoutDashboard }] },
+  {
+    title: "Overview",
+    items: [
+      { href: "/", screen: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/drafts", screen: "drafts", label: "Drafts to post", icon: FilePen },
+    ],
+  },
   {
     title: "Sales",
     items: [

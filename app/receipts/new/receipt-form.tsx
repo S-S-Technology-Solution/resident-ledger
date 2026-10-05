@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { fmtRM } from "@/lib/money";
 import { createReceipt } from "../actions";
+import { updateDraft } from "@/app/drafts/actions";
+import type { ReceiptInput } from "@/lib/receipt-posting";
 import { fetchOutstanding } from "./outstanding-action";
 import { unwrap } from "@/lib/action";
 
@@ -23,26 +25,31 @@ export function ReceiptForm({
   defaultResidentId,
   initialOpen,
   suggestedReceiptNo,
+  draftId,
+  initial,
 }: {
   residents: ResidentOpt[];
   defaultResidentId?: string;
   initialOpen: Charge[];
   suggestedReceiptNo: string;
+  // Editing a draft: its id and what was keyed.
+  draftId?: string;
+  initial?: Partial<ReceiptInput>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const today = new Date();
   const [residentId, setResidentId] = useState(defaultResidentId ?? "");
-  const [date, setDate] = useState(today.toISOString().slice(0, 10));
-  const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<"CASH" | "BANK">("BANK");
-  const [bankRef, setBankRef] = useState("");
-  const [receiptNo, setReceiptNo] = useState(suggestedReceiptNo);
+  const [date, setDate] = useState(initial?.date ?? today.toISOString().slice(0, 10));
+  const [amount, setAmount] = useState(initial?.amount ?? "");
+  const [method, setMethod] = useState<"CASH" | "BANK">(initial?.method ?? "BANK");
+  const [bankRef, setBankRef] = useState(initial?.bankRef ?? "");
+  const [receiptNo, setReceiptNo] = useState(initial?.receiptNo ?? suggestedReceiptNo);
   const ownerOf = (id: string) => residents.find((r) => r.id === id)?.ownerName ?? "";
-  const [receivedFrom, setReceivedFrom] = useState(defaultResidentId ? ownerOf(defaultResidentId) : "");
-  const [periodFrom, setPeriodFrom] = useState("");
-  const [periodTo, setPeriodTo] = useState("");
-  const [chequeNo, setChequeNo] = useState("");
+  const [receivedFrom, setReceivedFrom] = useState(initial?.receivedFrom ?? (defaultResidentId ? ownerOf(defaultResidentId) : ""));
+  const [periodFrom, setPeriodFrom] = useState(initial?.periodFrom ?? "");
+  const [periodTo, setPeriodTo] = useState(initial?.periodTo ?? "");
+  const [chequeNo, setChequeNo] = useState(initial?.chequeNo ?? "");
 
   // "Received From" starts as the owner but is whoever actually paid, as written on the receipt.
   function pickResident(id: string) {
@@ -50,7 +57,9 @@ export function ReceiptForm({
     setResidentId(id);
   }
   const [open, setOpen] = useState<Charge[]>(initialOpen);
-  const [allocs, setAllocs] = useState<Record<string, string>>({});
+  const [allocs, setAllocs] = useState<Record<string, string>>(
+    Object.fromEntries((initial?.allocations ?? []).map((a) => [a.chargeId, a.amount])),
+  );
 
   useEffect(() => {
     if (!residentId) { setOpen([]); return; }
@@ -194,19 +203,31 @@ export function ReceiptForm({
               const allocations = Object.entries(allocs)
                 .filter(([, v]) => new Decimal(v || 0).gt(0))
                 .map(([chargeId, v]) => ({ chargeId, amount: v }));
-              const r = await unwrap(createReceipt({
+              const input = {
                 residentId, date, amount, method, bankRef: bankRef || undefined, allocations,
                 receiptNo, receivedFrom: receivedFrom || undefined,
                 periodFrom: periodFrom || undefined, periodTo: periodTo || undefined,
                 chequeNo: chequeNo || undefined,
-              }));
-              toast.success(`Receipt ${r.receiptNo} created`);
-              router.push(`/receipts/${r.id}?print=1`);
+              };
+              if (draftId) {
+                await unwrap(updateDraft(draftId, { kind: "receipt", input }));
+                toast.success(`Draft ${receiptNo} updated`);
+                router.push(`/drafts/${draftId}`);
+                return;
+              }
+              const r = await unwrap(createReceipt(input));
+              if (r.draft) {
+                toast.success(`Receipt ${r.receiptNo} saved as a draft — check it and post it from Drafts`);
+                router.push(`/drafts/${r.id}`);
+              } else {
+                toast.success(`Receipt ${r.receiptNo} created`);
+                router.push(`/receipts/${r.id}?print=1`);
+              }
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Failed");
             }
           })}
-        >{pending ? "Saving…" : "Save & view receipt"}</Button>
+        >{pending ? "Saving…" : draftId ? "Save changes" : "Save receipt"}</Button>
       </div>
     </div>
   );

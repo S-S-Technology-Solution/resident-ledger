@@ -14,6 +14,7 @@ const schema = z.object({
   currency: z.string().min(1),
   fiscalYearStart: z.number().int().min(1).max(12),
   lockedThrough: z.string().optional(),
+  draftsRequired: z.boolean(),
 });
 
 export type SettingsInput = z.infer<typeof schema>;
@@ -31,6 +32,7 @@ export async function saveSettings(input: SettingsInput) {
         currency: data.currency,
         fiscalYearStart: data.fiscalYearStart,
         lockedThrough: data.lockedThrough ? new Date(data.lockedThrough) : null,
+        draftsRequired: data.draftsRequired,
       },
     });
     revalidatePath("/", "layout");

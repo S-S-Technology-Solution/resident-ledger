@@ -9,19 +9,26 @@ import { paymentMethodAccount } from "@/lib/control-accounts";
 import { prepareEntry } from "@/lib/journal";
 import { recordAudit } from "@/lib/audit";
 import { postReceipt, type ReceiptInput } from "@/lib/receipt-posting";
+import { draftsRequired, saveDraft } from "@/lib/drafts";
 import { releaseLineFor } from "@/lib/bank-statement/service";
 import { requirePosting } from "@/lib/permissions";
 import { attempt } from "@/lib/action-server";
 
 export type { ReceiptInput } from "@/lib/receipt-posting";
 
+/** Saves a receipt — as a draft for checking when that is switched on, otherwise posted straight away. */
 export async function createReceipt(input: ReceiptInput) {
   return attempt(async () => {
-    await requirePosting();
+    const user = await requirePosting();
+    if (await draftsRequired()) {
+      const d = await saveDraft({ kind: "receipt", input }, user.id);
+      revalidatePath("/drafts");
+      return { draft: true as const, id: d.id, receiptNo: d.number };
+    }
     const result = await postReceipt(input);
     revalidatePath("/receipts");
     revalidatePath(`/residents/${input.residentId}`);
-    return result;
+    return { draft: false as const, ...result };
   });
 }
 

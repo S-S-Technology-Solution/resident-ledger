@@ -6,6 +6,7 @@ import { createCashEntry, voidCashEntry } from "@/lib/cash-book";
 import { recordAudit } from "@/lib/audit";
 import { requirePosting } from "@/lib/permissions";
 import { attempt } from "@/lib/action-server";
+import { draftsRequired, saveDraft } from "@/lib/drafts";
 
 const money = z.string().regex(/^\d*\.?\d{0,2}$/, "Enter the amount in ringgit and sen, e.g. 120.50");
 const schema = z.object({
@@ -27,13 +28,18 @@ const schema = z.object({
 
 export async function createEntry(input: z.infer<typeof schema>) {
   return attempt(async () => {
-    await requirePosting();
+    const user = await requirePosting();
     const data = schema.parse(input);
+    if (await draftsRequired()) {
+      const d = await saveDraft({ kind: "cashEntry", input: data }, user.id);
+      revalidatePath("/drafts");
+      return { draft: true as const, id: d.id, refNo: d.number };
+    }
     const entry = await createCashEntry(data);
     revalidatePath("/cash-book");
     revalidatePath("/reports/cash-book");
     revalidatePath("/bank-statements");
-    return { id: entry.id, refNo: entry.refNo };
+    return { draft: false as const, id: entry.id, refNo: entry.refNo };
   });
 }
 

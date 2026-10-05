@@ -9,7 +9,7 @@
  * but never post from it.
  */
 export type ScreenKey =
-  | "dashboard" | "residents" | "charges" | "receipts" | "suppliers" | "bills"
+  | "dashboard" | "drafts" | "residents" | "charges" | "receipts" | "suppliers" | "bills"
   | "accounts" | "cash-book" | "journal" | "batches" | "bank-statements" | "reports"
   | "opening-balances" | "year-end" | "users" | "control-accounts" | "import" | "settings";
 
@@ -17,6 +17,7 @@ export type Screen = { key: ScreenKey; label: string; group: string; href: strin
 
 export const SCREENS: Screen[] = [
   { key: "dashboard", label: "Dashboard", group: "Overview", href: "/", prefixes: [] },
+  { key: "drafts", label: "Drafts to post", group: "Overview", href: "/drafts", prefixes: ["/drafts"] },
   { key: "residents", label: "Residents", group: "Sales", href: "/residents", prefixes: ["/residents"] },
   { key: "charges", label: "Charges", group: "Sales", href: "/charges", prefixes: ["/charges"] },
   { key: "receipts", label: "Receipts", group: "Sales", href: "/receipts", prefixes: ["/receipts"] },

@@ -19,6 +19,7 @@ export default async function SettingsPage() {
           currency: a.currency,
           fiscalYearStart: a.fiscalYearStart,
           lockedThrough: a.lockedThrough ? a.lockedThrough.toISOString().slice(0, 10) : "",
+          draftsRequired: a.draftsRequired,
         }}
       />
     </div>

@@ -13,25 +13,34 @@ import { toast } from "sonner";
 import { fmtRM } from "@/lib/money";
 import { unwrap } from "@/lib/action";
 import { createEntry } from "../actions";
+import { updateDraft } from "@/app/drafts/actions";
+import type { CashEntryInput } from "@/lib/cash-book";
 
 type Account = { id: string; code: string; name: string };
 type Line = { key: number; accountId: string; description: string; amount: string };
 
 export function VoucherForm({
-  direction, accounts, suggestedRefNo,
-}: { direction: "IN" | "OUT"; accounts: Account[]; suggestedRefNo: string }) {
+  direction, accounts, suggestedRefNo, draftId, initial,
+}: {
+  direction: "IN" | "OUT"; accounts: Account[]; suggestedRefNo: string;
+  draftId?: string; initial?: Partial<CashEntryInput>;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const isIn = direction === "IN";
-  const [refNo, setRefNo] = useState(suggestedRefNo);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<"BANK" | "CASH">("BANK");
-  const [counterparty, setCounterparty] = useState("");
-  const [description, setDescription] = useState("");
-  const [paymentFor, setPaymentFor] = useState("");
-  const [chequeNo, setChequeNo] = useState("");
-  const [bankRef, setBankRef] = useState("");
-  const [lines, setLines] = useState<Line[]>([{ key: 1, accountId: "", description: "", amount: "" }]);
+  const [refNo, setRefNo] = useState(initial?.refNo ?? suggestedRefNo);
+  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
+  const [method, setMethod] = useState<"BANK" | "CASH">(initial?.method === "CASH" ? "CASH" : "BANK");
+  const [counterparty, setCounterparty] = useState(initial?.counterparty ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [paymentFor, setPaymentFor] = useState(initial?.paymentFor ?? "");
+  const [chequeNo, setChequeNo] = useState(initial?.chequeNo ?? "");
+  const [bankRef, setBankRef] = useState(initial?.bankRef ?? "");
+  const [lines, setLines] = useState<Line[]>(
+    initial?.lines?.length
+      ? initial.lines.map((l, i) => ({ key: i + 1, accountId: l.accountId, description: l.description ?? "", amount: l.amount }))
+      : [{ key: 1, accountId: "", description: "", amount: "" }],
+  );
 
   const options = accounts.map((a) => ({ value: a.id, label: `${a.code} — ${a.name}` }));
   const total = lines.reduce((s, l) => s.plus(/^\d*\.?\d{0,2}$/.test(l.amount) && l.amount ? l.amount : 0), new Decimal(0));
@@ -41,14 +50,26 @@ export function VoucherForm({
   function submit() {
     start(async () => {
       try {
-        const res = await unwrap(createEntry({
+        const input = {
           direction, date, method, refNo,
           description, counterparty: counterparty || undefined, paymentFor: paymentFor || undefined,
           chequeNo: chequeNo || undefined, bankRef: bankRef || undefined,
           lines: lines.map(({ accountId, description, amount }) => ({ accountId, description, amount })),
-        }));
-        toast.success(`${isIn ? "Receipt" : "Payment voucher"} ${res.refNo} saved`);
-        router.push(`/cash-book/${res.id}`);
+        };
+        if (draftId) {
+          await unwrap(updateDraft(draftId, { kind: "cashEntry", input }));
+          toast.success(`Draft ${refNo} updated`);
+          router.push(`/drafts/${draftId}`);
+          return;
+        }
+        const res = await unwrap(createEntry(input));
+        if (res.draft) {
+          toast.success(`${res.refNo} saved as a draft — check it and post it from Drafts`);
+          router.push(`/drafts/${res.id}`);
+        } else {
+          toast.success(`${isIn ? "Receipt" : "Payment voucher"} ${res.refNo} saved`);
+          router.push(`/cash-book/${res.id}`);
+        }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to save");
       }
@@ -125,7 +146,7 @@ export function VoucherForm({
       </div>
 
       <div className="flex justify-end">
-        <Button disabled={pending || !ready} onClick={submit}>{pending ? "Saving…" : isIn ? "Save receipt" : "Save voucher"}</Button>
+        <Button disabled={pending || !ready} onClick={submit}>{pending ? "Saving…" : draftId ? "Save changes" : isIn ? "Save receipt" : "Save voucher"}</Button>
       </div>
     </div>
   );

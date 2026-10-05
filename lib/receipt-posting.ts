@@ -5,6 +5,7 @@ import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { controlAccount, paymentMethodAccount } from "./control-accounts";
 import { prepareEntry } from "./journal";
 import { nextReceiptNo } from "./receipts";
+import { numberInUse } from "./numbering";
 import { residentOutstanding } from "./ar";
 
 /**
@@ -59,8 +60,9 @@ export async function postReceipt(input: ReceiptInput) {
   const { entryNo, batchId } = await prepareEntry(new Date(data.date), "receipt");
   // "A 1004" as written in the book is stored as A1004, like the numbers the system issues.
   const receiptNo = data.receiptNo ? data.receiptNo.replace(/\s+/g, "").toUpperCase() : await nextReceiptNo();
-  const clash = await db.receipt.findFirst({ where: { associationId: DEFAULT_ASSOCIATION_ID, receiptNo }, select: { id: true } });
-  if (clash) throw new Error(`Receipt ${receiptNo} is already in the system. Check the number in the receipt book.`);
+  if (await numberInUse("RECEIPT", receiptNo)) {
+    throw new Error(`Receipt ${receiptNo} is already in the system (or held by a draft). Check the number in the receipt book.`);
+  }
 
   const receipt = await db.$transaction(async (tx) => {
     const entry = await tx.journalEntry.create({

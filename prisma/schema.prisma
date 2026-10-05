@@ -74,6 +74,9 @@ model Association {
   ctlBank         String?
   ctlCash         String?
   ctlAp           String?
+  // When on, receipts and payment vouchers are saved as drafts for checking
+  // and only reach the accounts when someone posts them.
+  draftsRequired  Boolean   @default(true)
   createdAt       DateTime  @default(now())
 
   accounts  Account[]
@@ -89,6 +92,7 @@ model Association {
   years       FiscalYear[]
   cashEntries CashEntry[]
   statements  BankStatement[]
+  drafts      Draft[]
 }
 
 // Document numbering, one row per document type. Mirrors Million's Reference No.
@@ -508,4 +512,29 @@ model BankStatementLine {
 
   @@unique([statementId, lineNo])
   @@index([matchKind, matchId])
+}
+
+// A receipt or payment keyed in but not yet posted. It has no journal entry and
+// no effect on any balance; posting runs the normal posting with the stored
+// input and removes the draft. The document number (from the receipt or voucher
+// book) is held here so it can't be used twice meanwhile.
+model Draft {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  // receipt | cashEntry | supplierPayment
+  kind          String
+  // For cash entries: IN or OUT, so numbers are checked in the right sequence.
+  direction     String?
+  number        String
+  date          DateTime
+  amount        Decimal     @db.Decimal(15, 2)
+  // Who it is from or to, for the drafts list.
+  party         String
+  payload       Json
+  createdBy     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([associationId, kind])
 }

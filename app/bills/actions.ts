@@ -11,6 +11,7 @@ import { requirePosting } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { postBillPayment, postSupplierPayment, supplierPaymentSchema } from "@/lib/bill-posting";
 import { postSupplierDebitNote, supplierDebitNoteSchema } from "@/lib/notes";
+import { draftsRequired, saveDraft } from "@/lib/drafts";
 import { releaseLineFor } from "@/lib/bank-statement/service";
 import { attempt } from "@/lib/action-server";
 
@@ -188,11 +189,16 @@ export async function voidBillPayment(paymentId: string, reason: string) {
 /** Pays one or more of a supplier's bills with one voucher. */
 export async function paySupplier(input: z.infer<typeof supplierPaymentSchema>) {
   return attempt(async () => {
-    await requirePosting();
+    const user = await requirePosting();
+    if (await draftsRequired()) {
+      const d = await saveDraft({ kind: "supplierPayment", input }, user.id);
+      revalidatePath("/drafts");
+      return { draft: true as const, id: d.id, voucherNo: d.number, total: d.amount.toFixed(2) };
+    }
     const result = await postSupplierPayment(input);
     revalidatePath("/bills");
     revalidatePath("/bank-statements");
-    return result;
+    return { draft: false as const, id: result.entryId, ...result };
   });
 }
 
