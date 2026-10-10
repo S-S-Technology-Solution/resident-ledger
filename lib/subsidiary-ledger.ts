@@ -178,7 +178,7 @@ export async function twelveMonthSummary(year: number, associationId = DEFAULT_A
   const bankLines = await db.journalLine.findMany({
     where: {
       accountId: { in: bankIds },
-      entry: { associationId, status: "POSTED", date: { lte: to } },
+      entry: { associationId, status: { not: "DRAFT" as const }, date: { lte: to } },
     },
     select: { debit: true, credit: true, entry: { select: { date: true } } },
   });

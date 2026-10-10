@@ -64,7 +64,7 @@ export function isBankCharge(type: string) {
 }
 
 export type BookItem = {
-  kind: "receipt" | "billPayment" | "cashEntry" | "refund";
+  kind: "receipt" | "billPayment" | "cashEntry" | "refund" | "bf";
   id: string;
   date: Date;
   amount: number;

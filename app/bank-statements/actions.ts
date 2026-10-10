@@ -6,8 +6,9 @@ import { requirePosting } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { parseRhbStatement } from "@/lib/bank-statement/rhb";
 import {
-  autoMatch, deleteStatement, markNoEntry, markReconciled, matchLine, reopenStatement, saveStatement, unmatchLine,
-  type MatchKind,
+  autoMatch, createBfItem, deleteBfItem, deleteStatement, groupOptions, markNoEntry, markReconciled, matchLine, matchLines,
+  reopenStatement, saveStatement, unmatchLine, updateBfItem,
+  type BfInput, type MatchKind, type Pick,
 } from "@/lib/bank-statement/service";
 
 // Expected failures come back as values so the reason reaches the screen in
@@ -18,6 +19,7 @@ async function run<T>(fn: () => Promise<T>, paths: string[] = []): Promise<Resul
   try {
     const data = await fn();
     for (const p of ["/bank-statements", "/settings", ...paths]) revalidatePath(p);
+    revalidatePath("/bank-statements/[id]", "page");
     return { ok: true, data };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
@@ -73,8 +75,37 @@ export async function markLineNoEntry(lineId: string, note: string) {
   });
 }
 
+/** Several lines with one book entry, or several entries with one line. */
+export async function matchStatementLines(lineIds: string[], picks: Pick[]) {
+  return run(async () => {
+    await requirePosting();
+    await matchLines(lineIds, picks);
+    await recordAudit("bankStatementLine", lineIds[0], "match", { after: { lineIds, picks } });
+  });
+}
 
+export async function getGroupOptions(lineId: string) {
+  return run(async () => {
+    await requirePosting();
+    return groupOptions(lineId);
+  });
+}
 
+export async function saveBfItem(id: string | null, input: BfInput) {
+  return run(async () => {
+    const user = await requirePosting();
+    const row = id ? await updateBfItem(id, input) : await createBfItem(input, user.id);
+    await recordAudit("bankBfItem", row.id, id ? "update" : "create", { after: input });
+  });
+}
+
+export async function removeBfItem(id: string) {
+  return run(async () => {
+    await requirePosting();
+    await deleteBfItem(id);
+    await recordAudit("bankBfItem", id, "delete");
+  });
+}
 
 export async function signOffStatement(statementId: string) {
   return run(async () => {

@@ -35,7 +35,7 @@ export default async function FixedAssetsPage({
     },
     include: {
       lines: {
-        where: { entry: { status: "POSTED", date: { lte: asOf } } },
+        where: { entry: { status: { not: "DRAFT" as const }, date: { lte: asOf } } },
         select: { debit: true, credit: true },
       },
     },

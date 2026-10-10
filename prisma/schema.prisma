@@ -93,6 +93,7 @@ model Association {
   cashEntries CashEntry[]
   statements  BankStatement[]
   drafts      Draft[]
+  bankBfItems BankBfItem[]
 }
 
 // Document numbering, one row per document type. Mirrors Million's Reference No.
@@ -508,10 +509,34 @@ model BankStatementLine {
   // presented again). Null while unmatched.
   matchKind   String?
   matchId     String?
+  // For matchKind "multi": one deposit or debit covering several book items,
+  // as [{ kind, id }]. Several lines can instead share one matchKind/matchId
+  // when the bank split one book item.
+  matchItems  Json?
   note        String?
 
   @@unique([statementId, lineNo])
   @@index([matchKind, matchId])
+}
+
+// A cheque or deposit already in the books before the cut-over but not through
+// the bank by then ("brought-forward" items). It posts nothing — the opening
+// balance already holds it — and stays on the reconciliation as outstanding
+// until it is matched with the statement line that clears it.
+model BankBfItem {
+  id            String      @id @default(cuid())
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  date          DateTime
+  // IN: deposit not yet credited; OUT: cheque not yet presented.
+  direction     String
+  amount        Decimal     @db.Decimal(15, 2)
+  chequeNo      String?
+  description   String
+  createdBy     String?
+  createdAt     DateTime    @default(now())
+
+  @@index([associationId])
 }
 
 // A receipt or payment keyed in but not yet posted. It has no journal entry and

@@ -29,7 +29,7 @@ async function plBalances(year: number, associationId = DEFAULT_ASSOCIATION_ID) 
     where: { associationId, type: { in: ["INCOME", "EXPENSE"] } },
     include: {
       lines: {
-        where: { entry: { status: "POSTED", date: { gte: from, lte: to } } },
+        where: { entry: { status: { not: "DRAFT" as const }, date: { gte: from, lte: to } } },
         select: { debit: true, credit: true },
       },
     },
@@ -211,7 +211,7 @@ export async function listFiscalYears(associationId = DEFAULT_ASSOCIATION_ID) {
   const [years, earliest, assoc] = await Promise.all([
     db.fiscalYear.findMany({ where: { associationId }, orderBy: { year: "desc" } }),
     db.journalEntry.findFirst({
-      where: { associationId, status: "POSTED" },
+      where: { associationId, status: { not: "DRAFT" as const } },
       orderBy: { date: "asc" },
       select: { date: true },
     }),

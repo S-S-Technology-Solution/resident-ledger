@@ -8,7 +8,7 @@ async function postedSum(accountId: string, range?: { from?: Date; to?: Date }) 
     where: {
       accountId,
       entry: {
-        status: "POSTED",
+        status: { not: "DRAFT" as const },
         ...(range?.from || range?.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
       },
     },

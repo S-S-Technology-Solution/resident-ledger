@@ -1,12 +1,25 @@
 import Decimal from "decimal.js";
+import { Prisma } from "@prisma/client";
 import { db } from "../db";
 import { DEFAULT_ASSOCIATION_ID } from "../association";
 import { controlAccount } from "../control-accounts";
 import type { ParsedStatement } from "./rhb";
 import { candidatesFor, guessResident, type BookItem } from "./match";
 
-export type MatchKind = "receipt" | "billPayment" | "cashEntry" | "refund";
+export type MatchKind = "receipt" | "billPayment" | "cashEntry" | "refund" | "bf";
+export type Pick = { kind: MatchKind; id: string };
+const KINDS: MatchKind[] = ["receipt", "billPayment", "cashEntry", "refund", "bf"];
 const NO_ENTRY = "none";
+// One statement line covering several book items, listed in matchItems.
+const MULTI = "multi";
+
+type LineRow = { id: string; matchKind: string | null; matchId: string | null; matchItems: Prisma.JsonValue };
+/** The book items a matched line stands for. */
+function picksOf(line: LineRow): Pick[] {
+  if (!line.matchKind || line.matchKind === NO_ENTRY) return [];
+  if (line.matchKind === MULTI) return (line.matchItems as Pick[] | null) ?? [];
+  return line.matchId ? [{ kind: line.matchKind as MatchKind, id: line.matchId }] : [];
+}
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -44,11 +57,14 @@ export async function saveStatement(
   }
   if (!previous) {
     // The first statement must open at the bank balance carried into the books.
+    // Cheques and deposits brought forward account for any gap.
     const opening = await openingBookBalance(associationId);
+    const bf = await db.bankBfItem.findMany({ where: { associationId } });
+    const bfNet = bf.reduce((s, b) => (b.direction === "IN" ? s.plus(b.amount.toString()) : s.minus(b.amount.toString())), new Decimal(0));
     const later = await db.bankStatement.findFirst({ where: { associationId, accountNo: parsed.accountNo } });
-    if (!later && !opening.eq(parsed.openingBalance)) {
+    if (!later && !opening.eq(parsed.openingBalance.plus(bfNet))) {
       throw new Error(
-        `This is the first statement, but it opens at RM ${parsed.openingBalance.toFixed(2)} while the bank balance brought forward in the books is RM ${opening.toFixed(2)}. Upload the statement that starts on the cut-over date first.`,
+        `This is the first statement, but it opens at RM ${parsed.openingBalance.toFixed(2)} while the bank balance brought forward in the books is RM ${opening.toFixed(2)}${bf.length ? ` (RM ${opening.minus(bfNet).toFixed(2)} after the brought-forward items)` : ""}. Upload the statement that starts on the cut-over date first, or add the cheques and deposits outstanding at the cut-over as brought-forward items.`,
       );
     }
   }
@@ -99,7 +115,7 @@ async function openingBookBalance(associationId = DEFAULT_ASSOCIATION_ID) {
  */
 export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includeVoided = false } = {}) {
   const voided = includeVoided ? {} : { voided: false };
-  const [receipts, payments, cash, refunds, matched] = await Promise.all([
+  const [receipts, payments, cash, refunds, bf, matched] = await Promise.all([
     db.receipt.findMany({
       where: { associationId, method: "BANK", ...voided, isOpeningBalance: false },
       include: { resident: { select: { ownerName: true, unitAddress: true } } },
@@ -114,12 +130,22 @@ export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includ
       where: { associationId, kind: "REFUND", method: "BANK", ...voided },
       include: { resident: { select: { ownerName: true, unitAddress: true } } },
     }),
+    db.bankBfItem.findMany({ where: { associationId } }),
     db.bankStatementLine.findMany({
-      where: { matchKind: { in: ["receipt", "billPayment", "cashEntry", "refund"] }, statement: { associationId } },
-      select: { matchKind: true, matchId: true, date: true, ref: true },
+      where: { matchKind: { in: [...KINDS, MULTI] }, statement: { associationId } },
+      select: { id: true, matchKind: true, matchId: true, matchItems: true, date: true, ref: true, debit: true, credit: true },
     }),
   ]);
-  const lineFor = new Map(matched.map((m) => [`${m.matchKind}:${m.matchId}`, m]));
+  // Each item's clearing lines. A line split across several items credits each
+  // with the item's own amount; lines sharing one item credit their own amounts.
+  const linesFor = new Map<string, { date: Date; ref: string; amount: number | null }[]>();
+  for (const m of matched) {
+    const multi = m.matchKind === MULTI;
+    for (const p of picksOf(m)) {
+      const k = `${p.kind}:${p.id}`;
+      linesFor.set(k, [...(linesFor.get(k) ?? []), { date: m.date, ref: m.ref, amount: multi ? null : Number(m.credit) + Number(m.debit) }]);
+    }
+  }
   const voidedEntryIds = [...receipts, ...cash, ...refunds].filter((x) => x.voided && x.entryId).map((x) => x.entryId!);
   const reversals = voidedEntryIds.length
     ? await db.journalEntry.findMany({ where: { reversesId: { in: voidedEntryIds } }, select: { reversesId: true, date: true } })
@@ -128,7 +154,7 @@ export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includ
   const voidedOn = (x: { voided: boolean; entryId: string | null; date: Date }) =>
     x.voided ? (x.entryId ? reversedOn.get(x.entryId) : undefined) ?? x.date : null;
 
-  const items: (BookItem & { href: string; voidedOn: Date | null; line: { date: Date; ref: string } | null })[] = [
+  const raw: (BookItem & { href: string; voidedOn: Date | null })[] = [
     ...receipts.map((r) => ({
       kind: "receipt" as const, id: r.id, date: r.date, amount: Number(r.amount), direction: "IN" as const,
       ref: r.receiptNo, label: `${r.resident.ownerName} — ${r.resident.unitAddress}`,
@@ -153,7 +179,19 @@ export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includ
       ref: c.refNo, label: c.counterparty ? `${c.counterparty} — ${c.description}` : c.description,
       bankRef: c.bankRef, chequeNo: c.chequeNo, href: `/cash-book/${c.id}`, voidedOn: voidedOn(c),
     })),
-  ].map((i) => ({ ...i, line: lineFor.get(`${i.kind}:${i.id}`) ?? null }));
+    ...bf.map((b) => ({
+      kind: "bf" as const, id: b.id, date: b.date, amount: Number(b.amount), direction: b.direction as "IN" | "OUT",
+      ref: b.chequeNo ? `B/F chq ${b.chequeNo}` : "B/F", label: `Brought forward — ${b.description}`,
+      bankRef: null, chequeNo: b.chequeNo, href: "/bank-statements#brought-forward", voidedOn: null,
+    })),
+  ];
+  const items = raw.map((i) => {
+    const lines = (linesFor.get(`${i.kind}:${i.id}`) ?? [])
+      .map((l) => ({ date: l.date, ref: l.ref, amount: l.amount ?? i.amount }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    // `line` is the last line that cleared it — null while nothing has.
+    return { ...i, lines, line: lines.at(-1) ?? null };
+  });
   return items;
 }
 
@@ -167,6 +205,8 @@ async function assertEditable(lineId: string) {
 }
 
 async function setCleared(kind: MatchKind, id: string, line: { date: Date; ref: string } | null) {
+  // Brought-forward items post nothing, so there is no document to mark.
+  if (kind === "bf") return;
   const data = { cleared: line !== null, clearedAt: line?.date ?? null, statementRef: line?.ref ?? null };
   if (kind === "receipt") await db.receipt.update({ where: { id }, data });
   // Bill payments are matched per voucher (its journal entry), covering every bill it paid.
@@ -177,29 +217,82 @@ async function setCleared(kind: MatchKind, id: string, line: { date: Date; ref: 
 
 /** Pairs a line with a book item after checking they are the same money. */
 export async function matchLine(lineId: string, kind: MatchKind, itemId: string) {
-  const line = await assertEditable(lineId);
-  if (line.matchKind) throw new Error(`Line ${line.ref} is already matched.`);
-  const item = (await bookItems(line.statement.associationId)).find((i) => i.kind === kind && i.id === itemId);
-  if (!item) throw new Error("That book entry no longer exists or is voided.");
-  if (item.line) throw new Error(`${item.ref} is already matched to statement line ${item.line.ref}.`);
+  await matchLines([lineId], [{ kind, id: itemId }]);
+}
 
-  const isIn = Number(line.credit) > 0;
-  const amount = isIn ? Number(line.credit) : Number(line.debit);
-  if (item.direction !== (isIn ? "IN" : "OUT")) throw new Error("Money in can only match a receipt, and money out a payment.");
-  if (Math.abs(item.amount - amount) >= 0.005) {
-    throw new Error(`Amounts differ: the statement shows RM ${amount.toFixed(2)}, ${item.ref} is RM ${item.amount.toFixed(2)}.`);
+/**
+ * Pairs statement lines with book items when the totals agree: one with one,
+ * several book items paid in as one deposit, or one book item the bank split
+ * over several lines (e.g. a RM 3,000 receipt credited as 2,880 + 120).
+ */
+export async function matchLines(lineIds: string[], picks: Pick[]) {
+  lineIds = [...new Set(lineIds)];
+  if (!lineIds.length || !picks.length) throw new Error("Choose at least one statement line and one book entry.");
+  if (lineIds.length > 1 && picks.length > 1) {
+    throw new Error("Match one book entry with several lines, or several entries with one line — not both at once.");
+  }
+  const lines = await Promise.all(lineIds.map(assertEditable));
+  for (const l of lines) if (l.matchKind) throw new Error(`Line ${l.ref} is already matched.`);
+  const isIn = Number(lines[0].credit) > 0;
+  if (lines.some((l) => Number(l.credit) > 0 !== isIn)) throw new Error("Money in and money out can't be matched together.");
+
+  const all = await bookItems(lines[0].statement.associationId);
+  const items = picks.map((p) => {
+    const item = all.find((i) => i.kind === p.kind && i.id === p.id);
+    if (!item) throw new Error("A book entry chosen no longer exists or is voided.");
+    if (item.line) throw new Error(`${item.ref} is already matched to statement line ${item.line.ref}.`);
+    if (item.direction !== (isIn ? "IN" : "OUT")) throw new Error("Money in can only match a receipt, and money out a payment.");
+    return item;
+  });
+  if (new Set(items.map((i) => `${i.kind}:${i.id}`)).size !== items.length) throw new Error("The same book entry was chosen twice.");
+
+  const lineTotal = lines.reduce((s, l) => s.plus(isIn ? l.credit.toString() : l.debit.toString()), new Decimal(0));
+  const itemTotal = items.reduce((s, i) => s.plus(i.amount), new Decimal(0));
+  if (!lineTotal.eq(itemTotal.toDecimalPlaces(2))) {
+    const what = items.length === 1 ? items[0].ref : `the ${items.length} entries`;
+    throw new Error(`Amounts differ: the statement shows RM ${lineTotal.toFixed(2)}, ${what} ${items.length === 1 ? "is" : "come to"} RM ${itemTotal.toFixed(2)}.`);
   }
 
-  await db.bankStatementLine.update({ where: { id: lineId }, data: { matchKind: kind, matchId: itemId, note: null } });
-  await setCleared(kind, itemId, { date: line.date, ref: line.ref });
+  if (items.length === 1) {
+    await db.bankStatementLine.updateMany({
+      where: { id: { in: lineIds } },
+      data: { matchKind: items[0].kind, matchId: items[0].id, note: null },
+    });
+  } else {
+    await db.bankStatementLine.update({
+      where: { id: lineIds[0] },
+      data: { matchKind: MULTI, matchId: null, matchItems: picks, note: null },
+    });
+  }
+  const last = lines.reduce((a, b) => (b.date > a.date ? b : a));
+  const refs = lines.map((l) => l.ref).sort().join(", ");
+  for (const i of items) await setCleared(i.kind, i.id, { date: last.date, ref: refs });
+}
+
+/**
+ * Everything matched together with a line: the lines sharing its book item
+ * (a split) and the items it covers. Undoing any part undoes the whole match,
+ * refused if any of the lines sits on a signed-off statement.
+ */
+async function releaseGroup(line: LineRow) {
+  const picks = picksOf(line);
+  const lines = line.matchKind && line.matchKind !== NO_ENTRY && line.matchKind !== MULTI
+    ? await db.bankStatementLine.findMany({ where: { matchKind: line.matchKind, matchId: line.matchId }, include: { statement: true } })
+    : await db.bankStatementLine.findMany({ where: { id: line.id }, include: { statement: true } });
+  const signed = lines.find((l) => l.statement.reconciledAt);
+  if (signed) {
+    throw new Error(`This match includes line ${signed.ref} on the reconciled statement to ${iso(signed.statement.periodTo)}. Reopen that statement first.`);
+  }
+  await db.bankStatementLine.updateMany({
+    where: { id: { in: lines.map((l) => l.id) } },
+    data: { matchKind: null, matchId: null, matchItems: Prisma.DbNull, note: null },
+  });
+  for (const p of picks) await setCleared(p.kind, p.id, null);
 }
 
 export async function unmatchLine(lineId: string) {
   const line = await assertEditable(lineId);
-  if (line.matchKind && line.matchKind !== NO_ENTRY && line.matchId) {
-    await setCleared(line.matchKind as MatchKind, line.matchId, null);
-  }
-  await db.bankStatementLine.update({ where: { id: lineId }, data: { matchKind: null, matchId: null, note: null } });
+  await releaseGroup(line);
 }
 
 /**
@@ -209,17 +302,11 @@ export async function unmatchLine(lineId: string) {
  * under the accountant's feet.
  */
 export async function releaseLineFor(kind: MatchKind, itemId: string) {
-  const line = await db.bankStatementLine.findFirst({
-    where: { matchKind: kind, matchId: itemId },
-    include: { statement: true },
+  const lines = await db.bankStatementLine.findMany({
+    where: { OR: [{ matchKind: kind, matchId: itemId }, { matchKind: MULTI }] },
   });
-  if (!line) return;
-  if (line.statement.reconciledAt) {
-    throw new Error(
-      `This entry is on the reconciled bank statement to ${iso(line.statement.periodTo)} (line ${line.ref}). Reopen that statement before voiding it.`,
-    );
-  }
-  await db.bankStatementLine.update({ where: { id: line.id }, data: { matchKind: null, matchId: null, note: null } });
+  const line = lines.find((l) => picksOf(l).some((p) => p.kind === kind && p.id === itemId));
+  if (line) await releaseGroup(line);
 }
 
 /** For a line with no book entry of its own, e.g. a bounced cheque presented again. */
@@ -304,9 +391,11 @@ export async function reconciliation(statementId: string) {
   ]);
 
   // In the books at the date (posted by then, not yet reversed) and not through the bank by then.
-  const outstanding = items.filter(
-    (i) => i.date <= asAt && !(i.voidedOn && i.voidedOn <= asAt) && (!i.line || i.line.date > asAt),
-  );
+  // An item the bank split over several lines is outstanding by whatever had not cleared by then.
+  const outstanding = items
+    .filter((i) => i.date <= asAt && !(i.voidedOn && i.voidedOn <= asAt))
+    .map((i) => ({ ...i, amount: Math.round((i.amount - i.lines.filter((l) => l.date <= asAt).reduce((s, l) => s + l.amount, 0)) * 100) / 100 }))
+    .filter((i) => Math.abs(i.amount) >= 0.005);
   const depositsInTransit = outstanding.filter((i) => i.direction === "IN");
   const unpresented = outstanding.filter((i) => i.direction === "OUT");
   const unmatched = bankLines.filter((l) => l.matchKind === null);
@@ -387,7 +476,92 @@ export async function deleteStatement(statementId: string) {
   const statement = await db.bankStatement.findUniqueOrThrow({ where: { id: statementId }, include: { lines: true } });
   if (statement.reconciledAt) throw new Error("Reopen the statement before deleting it.");
   for (const l of statement.lines) {
-    if (l.matchKind && l.matchKind !== NO_ENTRY && l.matchId) await setCleared(l.matchKind as MatchKind, l.matchId, null);
+    if (l.matchKind && l.matchKind !== NO_ENTRY) await releaseGroup(l);
   }
   await db.bankStatement.delete({ where: { id: statementId } });
+}
+
+// ── Brought-forward items ────────────────────────────────────────────────────
+
+export type BfInput = { date: string; direction: "IN" | "OUT"; amount: string; chequeNo?: string; description: string };
+
+function checkBf(input: BfInput) {
+  const amount = new Decimal(input.amount || 0);
+  if (amount.lte(0)) throw new Error("Enter the amount.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error("Enter the date it was issued or banked.");
+  if (!input.description.trim()) throw new Error("Say who the cheque was to, or what the deposit was.");
+  if (input.direction !== "IN" && input.direction !== "OUT") throw new Error("Choose cheque (out) or deposit (in).");
+  return {
+    date: new Date(input.date), direction: input.direction, amount: amount.toFixed(2),
+    chequeNo: input.chequeNo?.trim() || null, description: input.description.trim(),
+  };
+}
+
+export async function listBfItems(associationId = DEFAULT_ASSOCIATION_ID) {
+  const [rows, items] = await Promise.all([
+    db.bankBfItem.findMany({ where: { associationId }, orderBy: [{ date: "asc" }, { createdAt: "asc" }] }),
+    bookItems(associationId),
+  ]);
+  const cleared = new Map(items.filter((i) => i.kind === "bf").map((i) => [i.id, i.line]));
+  return rows.map((r) => ({ ...r, amount: Number(r.amount), clearedBy: cleared.get(r.id) ?? null }));
+}
+
+export async function createBfItem(input: BfInput, by: string | null, associationId = DEFAULT_ASSOCIATION_ID) {
+  return db.bankBfItem.create({ data: { ...checkBf(input), associationId, createdBy: by } });
+}
+
+async function assertBfFree(id: string) {
+  const item = (await bookItems()).find((i) => i.kind === "bf" && i.id === id);
+  if (!item) throw new Error("That brought-forward item no longer exists.");
+  if (item.line) throw new Error(`It is matched to statement line ${item.line.ref}. Undo that match first.`);
+}
+
+export async function updateBfItem(id: string, input: BfInput) {
+  await assertBfFree(id);
+  return db.bankBfItem.update({ where: { id }, data: checkBf(input) });
+}
+
+export async function deleteBfItem(id: string) {
+  await assertBfFree(id);
+  await db.bankBfItem.delete({ where: { id } });
+}
+
+/** Keyed-but-unposted drafts paid through the bank — they can't be matched until posted. */
+export async function bankDrafts(associationId = DEFAULT_ASSOCIATION_ID) {
+  const drafts = await db.draft.findMany({ where: { associationId } });
+  return drafts
+    .filter((d) => ((d.payload as { input?: { method?: string } }).input?.method ?? "BANK") === "BANK")
+    .map((d) => ({
+      id: d.id, number: d.number, date: d.date, amount: Number(d.amount), party: d.party,
+      direction: (d.kind === "receipt" ? "IN" : d.kind === "supplierPayment" ? "OUT" : d.direction) as "IN" | "OUT",
+    }));
+}
+
+/** Unmatched lines and free book items that could be matched together with a line. */
+export async function groupOptions(lineId: string) {
+  const line = await db.bankStatementLine.findUniqueOrThrow({ where: { id: lineId }, include: { statement: true } });
+  const isIn = Number(line.credit) > 0;
+  const [others, items] = await Promise.all([
+    db.bankStatementLine.findMany({
+      where: {
+        statementId: line.statementId, matchKind: null, id: { not: line.id },
+        ...(isIn ? { credit: { gt: 0 } } : { debit: { gt: 0 } }),
+      },
+      orderBy: { lineNo: "asc" },
+    }),
+    bookItems(line.statement.associationId),
+  ]);
+  const DAY = 86_400_000;
+  const near = (d: Date) => Math.abs(d.getTime() - line.date.getTime()) / DAY;
+  return {
+    lines: others.map((o) => ({
+      id: o.id, ref: o.ref, date: iso(o.date), amount: Number(isIn ? o.credit : o.debit),
+      label: [o.type, o.serial, o.details.split("\n")[0]].filter(Boolean).join(" · "),
+    })),
+    items: items
+      .filter((i) => !i.line && i.direction === (isIn ? "IN" : "OUT") && (i.kind === "bf" || near(i.date) <= 45))
+      .sort((a, b) => near(a.date) - near(b.date))
+      .slice(0, 80)
+      .map((i) => ({ kind: i.kind, id: i.id, ref: i.ref, label: i.label, date: iso(i.date), amount: i.amount })),
+  };
 }

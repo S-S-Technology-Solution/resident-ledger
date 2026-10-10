@@ -35,7 +35,7 @@ export default async function CashFlowPage({
       accountId: { in: cashIds },
       entry: {
         associationId: DEFAULT_ASSOCIATION_ID,
-        status: "POSTED",
+        status: { not: "DRAFT" as const },
         date: { ...(fromDate && { gte: fromDate }), lte: toDate },
       },
     },
@@ -49,7 +49,7 @@ export default async function CashFlowPage({
     ? await db.journalLine.findMany({
         where: {
           accountId: { in: cashIds },
-          entry: { associationId: DEFAULT_ASSOCIATION_ID, status: "POSTED", date: { lt: fromDate } },
+          entry: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "DRAFT" as const }, date: { lt: fromDate } },
         },
         select: { debit: true, credit: true },
       })

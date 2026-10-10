@@ -10,6 +10,9 @@ import { Empty } from "@/components/empty";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UploadForm } from "./upload-form";
+import { BfItems } from "./bf-items";
+import { listBfItems } from "@/lib/bank-statement/service";
+import { getCurrentUser, canPost } from "@/lib/permissions";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +24,18 @@ export default async function BankStatementsPage() {
     orderBy: { periodFrom: "desc" },
     include: { lines: { select: { matchKind: true } } },
   });
+  const [bf, user, opening] = await Promise.all([
+    listBfItems(DEFAULT_ASSOCIATION_ID),
+    getCurrentUser(),
+    db.journalEntry.findFirst({ where: { associationId: DEFAULT_ASSOCIATION_ID, source: "opening" }, orderBy: { date: "asc" }, select: { date: true } }),
+  ]);
+  const lineStatement = new Map(
+    (await db.bankStatementLine.findMany({
+      where: { ref: { in: bf.flatMap((b) => (b.clearedBy ? b.clearedBy.ref.split(", ") : [])) } },
+      select: { ref: true, statementId: true },
+    })).map((l) => [l.ref, l.statementId]),
+  );
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -77,6 +92,16 @@ export default async function BankStatementsPage() {
           />
         )}
       </DataCard>
+
+      <BfItems
+        canEdit={!!user && canPost(user.role)}
+        cutover={opening ? iso(opening.date) : iso(new Date())}
+        rows={bf.map((b) => ({
+          id: b.id, date: iso(b.date), direction: b.direction as "IN" | "OUT", amount: b.amount, chequeNo: b.chequeNo,
+          description: b.description,
+          clearedBy: b.clearedBy ? { ref: b.clearedBy.ref, date: iso(b.clearedBy.date), statementId: lineStatement.get(b.clearedBy.ref) ?? null } : null,
+        }))}
+      />
     </div>
   );
 }

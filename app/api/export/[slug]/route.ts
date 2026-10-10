@@ -29,14 +29,10 @@ export const dynamic = "force-dynamic";
 async function buildReport(slug: string, sp: URLSearchParams): Promise<ReportData> {
   const range = { from: sp.get("from") ?? undefined, to: sp.get("to") ?? undefined };
   switch (slug) {
-    case "trial-balance": return trialBalance(range);
+    case "trial-balance": return trialBalance({ ...range, view: sp.get("view") ?? undefined });
     case "profit-loss": return profitLoss(range);
     case "balance-sheet": return balanceSheet(range);
-    case "general-ledger": {
-      const accountId = sp.get("accountId");
-      if (!accountId) throw new Error("accountId is required for general-ledger");
-      return generalLedgerReport(accountId, range);
-    }
+    case "general-ledger": return generalLedgerReport(sp.get("accountId") ?? undefined, range);
     case "ar-ageing": return arAgeing(range);
     case "collection": return collectionReport(range);
     case "ap-ageing": return apAgeing(range);

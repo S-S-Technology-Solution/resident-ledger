@@ -31,11 +31,11 @@ export default async function CashBookPage({
 
   const [linesBefore, linesInRange] = await Promise.all([
     db.journalLine.findMany({
-      where: { accountId: acc.id, entry: { date: { lt: fromDate }, status: "POSTED" } },
+      where: { accountId: acc.id, entry: { date: { lt: fromDate }, status: { not: "DRAFT" as const } } },
       select: { debit: true, credit: true },
     }),
     db.journalLine.findMany({
-      where: { accountId: acc.id, entry: { date: { gte: fromDate, lte: toDate }, status: "POSTED" } },
+      where: { accountId: acc.id, entry: { date: { gte: fromDate, lte: toDate }, status: { not: "DRAFT" as const } } },
       include: { entry: true },
     }),
   ]);

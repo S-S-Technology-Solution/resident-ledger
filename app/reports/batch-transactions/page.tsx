@@ -34,7 +34,7 @@ export default async function BatchTransactionsPage({
         where: { associationId_batchNo: { associationId: DEFAULT_ASSOCIATION_ID, batchNo } },
         include: {
           entries: {
-            where: { status: "POSTED" },
+            where: { status: { not: "DRAFT" as const } },
             orderBy: [{ date: "asc" }, { entryNo: "asc" }],
             include: { lines: { include: { account: true }, orderBy: { lineNo: "asc" } } },
           },

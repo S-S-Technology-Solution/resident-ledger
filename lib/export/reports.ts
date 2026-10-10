@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { db } from "../db";
 import { DEFAULT_ASSOCIATION_ID, getAssociation } from "../association";
-import { accountBalances, generalLedger } from "../reports";
+import { accountBalances, generalLedgerAll, trialBalanceRows } from "../reports";
 import { ageingBucket } from "../ar";
 import type { ReportData, Column } from "./types";
 
@@ -29,29 +29,47 @@ async function base(): Promise<Pick<ReportData, "associationName" | "generatedAt
 
 const numCol = (key: string, header: string, width = 1): Column => ({ key, header, money: true, align: "right", width });
 
-export async function trialBalance(r: Range): Promise<ReportData> {
-  const range = parseRange(r);
-  const accs = await accountBalances(range);
-  const used = accs.filter((a) => !a.debit.eq(0) || !a.credit.eq(0));
-  const totalD = used.reduce((s, a) => s.plus(a.debit), new Decimal(0));
-  const totalC = used.reduce((s, a) => s.plus(a.credit), new Decimal(0));
+/** Year-to-date trial balance as at r.to, or b/f · movement · closing for r.from–r.to (view "movement"). */
+export async function trialBalance(r: Range & { view?: string }): Promise<ReportData> {
+  const to = r.to ?? new Date().toISOString().slice(0, 10);
+  const movement = r.view === "movement";
+  const from = movement ? (r.from ?? `${to.slice(0, 8)}01`) : undefined;
+  const rows = await trialBalanceRows({ from: from ? new Date(from) : undefined, to: new Date(to) });
+  const dr = (v: Decimal) => (v.gt(0) ? v.toNumber() : "");
+  const cr = (v: Decimal) => (v.lt(0) ? v.neg().toNumber() : "");
+  const sum = (f: (x: (typeof rows)[number]) => Decimal) => rows.reduce((s, x) => s.plus(f(x)), new Decimal(0));
+  const pos = (v: Decimal) => (v.gt(0) ? v : new Decimal(0));
+  if (!movement) {
+    const shown = rows.filter((x) => !x.closing.eq(0));
+    return {
+      ...(await base()),
+      title: "Trial Balance",
+      subtitle: `Year-to-date as at ${to}`,
+      columns: [{ key: "code", header: "A/C No.", width: 1.2 }, { key: "name", header: "Account", width: 4 }, numCol("debit", "Debit", 2), numCol("credit", "Credit", 2)],
+      rows: shown.map((x) => ({ code: x.code, name: x.name, debit: dr(x.closing), credit: cr(x.closing) })),
+      totals: { code: "", name: "TOTAL", debit: sum((x) => pos(x.closing)).toNumber(), credit: sum((x) => pos(x.closing.neg())).toNumber() },
+    };
+  }
   return {
     ...(await base()),
-    title: "Trial Balance",
-    subtitle: rangeSubtitle(r),
+    title: "Trial Balance — movement",
+    subtitle: `${from} to ${to}`,
     columns: [
-      { key: "code", header: "Code", width: 1 },
-      { key: "name", header: "Account", width: 4 },
-      numCol("debit", "Debit", 2),
-      numCol("credit", "Credit", 2),
+      { key: "code", header: "A/C No.", width: 1.2 }, { key: "name", header: "Account", width: 3.5 },
+      numCol("openDr", "B/f Dr", 1.5), numCol("openCr", "B/f Cr", 1.5), numCol("debit", "Debit", 1.5), numCol("credit", "Credit", 1.5),
+      numCol("closeDr", "Closing Dr", 1.5), numCol("closeCr", "Closing Cr", 1.5),
     ],
-    rows: used.map((a) => ({
-      code: a.code,
-      name: a.name,
-      debit: a.debit.gt(0) ? a.debit.toNumber() : "",
-      credit: a.credit.gt(0) ? a.credit.toNumber() : "",
+    rows: rows.map((x) => ({
+      code: x.code, name: x.name, openDr: dr(x.opening), openCr: cr(x.opening),
+      debit: x.debit.gt(0) ? x.debit.toNumber() : "", credit: x.credit.gt(0) ? x.credit.toNumber() : "",
+      closeDr: dr(x.closing), closeCr: cr(x.closing),
     })),
-    totals: { code: "", name: "TOTAL", debit: totalD.toNumber(), credit: totalC.toNumber() },
+    totals: {
+      code: "", name: "TOTAL",
+      openDr: sum((x) => pos(x.opening)).toNumber(), openCr: sum((x) => pos(x.opening.neg())).toNumber(),
+      debit: sum((x) => x.debit).toNumber(), credit: sum((x) => x.credit).toNumber(),
+      closeDr: sum((x) => pos(x.closing)).toNumber(), closeCr: sum((x) => pos(x.closing.neg())).toNumber(),
+    },
   };
 }
 
@@ -127,30 +145,38 @@ export async function balanceSheet(r: Range): Promise<ReportData> {
   };
 }
 
-export async function generalLedgerReport(accountId: string, r: Range): Promise<ReportData> {
+/** The general ledger for all accounts (or one), each with its balance brought forward. */
+export async function generalLedgerReport(accountId: string | undefined, r: Range): Promise<ReportData> {
   const range = parseRange(r);
-  const { account, opening, rows: lines, closing } = await generalLedger(accountId, range);
+  const sections = await generalLedgerAll({ ...range, accountId });
+  const sideText = (v: Decimal) => (v.eq(0) ? "0.00" : `${v.abs().toFixed(2)} ${v.gt(0) ? "Dr" : "Cr"}`);
+  const rows: ReportData["rows"] = [];
+  for (const s of sections) {
+    rows.push({ date: s.account.code, batch: "", ref: "", description: s.account.name.toUpperCase(), debit: "", credit: "", balance: "" });
+    rows.push({ date: "", batch: "", ref: "", description: "Balance B/F", debit: "", credit: "", balance: sideText(s.opening) });
+    for (const l of s.rows) {
+      rows.push({
+        date: l.date.toISOString().slice(0, 10), batch: l.batch, ref: l.ref, description: l.description,
+        debit: l.debit.gt(0) ? l.debit.toNumber() : "", credit: l.credit.gt(0) ? l.credit.toNumber() : "", balance: sideText(l.balance),
+      });
+    }
+    rows.push({ date: "", batch: "", ref: "", description: "Total · closing balance", debit: s.debit.toNumber(), credit: s.credit.toNumber(), balance: sideText(s.closing) });
+  }
+  const one = accountId && sections[0] ? ` — ${sections[0].account.code} ${sections[0].account.name}` : "";
   return {
     ...(await base()),
-    title: `General Ledger — ${account.code} ${account.name}`,
-    subtitle: rangeSubtitle(r) + ` · Opening ${opening.toFixed(2)}`,
+    title: `General Ledger${one}`,
+    subtitle: rangeSubtitle(r),
     columns: [
       { key: "date", header: "Date", width: 1.2 },
-      { key: "entryNo", header: "Entry #", width: 1.5 },
-      { key: "description", header: "Description", width: 4 },
-      numCol("debit", "Debit", 1.5),
-      numCol("credit", "Credit", 1.5),
-      numCol("balance", "Balance", 1.5),
+      { key: "batch", header: "Batch", width: 0.9 },
+      { key: "ref", header: "Ref. No.", width: 1.3 },
+      { key: "description", header: "Description", width: 3.6 },
+      numCol("debit", "Debit", 1.4),
+      numCol("credit", "Credit", 1.4),
+      { key: "balance", header: "Balance", align: "right", width: 1.6 },
     ],
-    rows: lines.map((l) => ({
-      date: l.date.toISOString().slice(0, 10),
-      entryNo: l.entryNo,
-      description: l.description + (l.memo ? ` — ${l.memo}` : ""),
-      debit: l.debit.gt(0) ? l.debit.toNumber() : "",
-      credit: l.credit.gt(0) ? l.credit.toNumber() : "",
-      balance: l.balance.toNumber(),
-    })),
-    totals: { date: "", entryNo: "", description: "Closing balance", debit: "", credit: "", balance: closing.toNumber() },
+    rows,
   };
 }
 
@@ -325,7 +351,7 @@ export async function expenseByCategory(r: Range): Promise<ReportData> {
       lines: {
         where: {
           entry: {
-            status: "POSTED",
+            status: { not: "DRAFT" as const },
             ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
           },
         },
@@ -443,7 +469,7 @@ export async function fixedAssets(r: Range): Promise<ReportData> {
   const accounts = await db.account.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID, classifiedAs: { in: ["FA", "FD"] } },
     include: {
-      lines: { where: { entry: { status: "POSTED", date: { lte: asOf } } }, select: { debit: true, credit: true } },
+      lines: { where: { entry: { status: { not: "DRAFT" as const }, date: { lte: asOf } } }, select: { debit: true, credit: true } },
     },
     orderBy: { code: "asc" },
   });
@@ -696,7 +722,7 @@ export async function accountRange(r: Range & { fromCode?: string; toCode?: stri
   const asOf = r.to ? new Date(r.to) : new Date();
   const accounts = await db.account.findMany({
     where: { associationId: DEFAULT_ASSOCIATION_ID },
-    include: { lines: { where: { entry: { status: "POSTED", date: { lte: asOf } } }, select: { debit: true, credit: true } } },
+    include: { lines: { where: { entry: { status: { not: "DRAFT" as const }, date: { lte: asOf } } }, select: { debit: true, credit: true } } },
     orderBy: { code: "asc" },
   });
 
@@ -737,7 +763,7 @@ export async function batchTransactions(r: { batch?: string }): Promise<ReportDa
     where: { associationId_batchNo: { associationId: DEFAULT_ASSOCIATION_ID, batchNo: r.batch } },
     include: {
       entries: {
-        where: { status: "POSTED" },
+        where: { status: { not: "DRAFT" as const } },
         orderBy: [{ date: "asc" }, { entryNo: "asc" }],
         include: { lines: { include: { account: true }, orderBy: { lineNo: "asc" } } },
       },

@@ -29,7 +29,7 @@ export default async function BatchesPage({
     orderBy: [{ year: "desc" }, { month: "desc" }, { group: "asc" }],
     include: {
       entries: {
-        where: { status: "POSTED" },
+        where: { status: { not: "DRAFT" as const } },
         select: { id: true, lines: { select: { debit: true } } },
       },
     },

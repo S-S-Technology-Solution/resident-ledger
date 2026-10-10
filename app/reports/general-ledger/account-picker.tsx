@@ -19,11 +19,11 @@ export function AccountPicker({
         value={selected ?? ""}
         onChange={(v) => {
           const q = new URLSearchParams(sp.toString());
-          q.set("accountId", v);
+          if (v) q.set("accountId", v); else q.delete("accountId");
           router.push(`${path}?${q.toString()}`);
         }}
-        placeholder="Select account…"
-        options={accounts.map((a) => ({ value: a.id, label: a.name, hint: a.code }))}
+        placeholder="All accounts"
+        options={[{ value: "", label: "All accounts" }, ...accounts.map((a) => ({ value: a.id, label: a.name, hint: a.code }))]}
       />
     </div>
   );

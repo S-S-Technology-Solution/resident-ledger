@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
 import { getCurrentUser, canPost } from "@/lib/permissions";
-import { bookItems, reconciliation } from "@/lib/bank-statement/service";
+import { bankDrafts, bookItems, reconciliation, type Pick } from "@/lib/bank-statement/service";
 import { candidatesFor, guessResident, isBankCharge } from "@/lib/bank-statement/match";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
@@ -27,9 +27,10 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   });
   if (!statement) notFound();
 
-  const [rec, items, residents, user] = await Promise.all([
+  const [rec, items, drafts, residents, user] = await Promise.all([
     reconciliation(id),
     bookItems(statement.associationId),
+    bankDrafts(statement.associationId),
     db.resident.findMany({
       where: { associationId: DEFAULT_ASSOCIATION_ID },
       select: { id: true, debtorCode: true, unitAddress: true, ownerName: true },
@@ -46,12 +47,28 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
     statement.lines.map((l) => {
       const debit = Number(l.debit), credit = Number(l.credit);
       const details = l.details ? l.details.split("\n") : [];
-      const matchedItem = l.matchKind && l.matchKind !== "none" ? byKey.get(`${l.matchKind}:${l.matchId}`) : undefined;
+      const picks: Pick[] = l.matchKind === "multi" ? ((l.matchItems as Pick[] | null) ?? [])
+        : l.matchKind && l.matchKind !== "none" && l.matchId ? [{ kind: l.matchKind as Pick["kind"], id: l.matchId }] : [];
+      const matchedItems = picks.map((p) => byKey.get(`${p.kind}:${p.id}`)).filter((i) => !!i);
+      const matchedItem = matchedItems[0];
+      // A split item lists its other lines; a multi line lists its other entries.
+      const together = matchedItems.length > 1
+        ? `With ${matchedItems.slice(1).map((i) => i.ref).join(", ")} — RM ${matchedItems.reduce((s, i) => s + i.amount, 0).toFixed(2)} in all`
+        : matchedItem && matchedItem.lines.length > 1
+          ? `Split over ${matchedItem.lines.map((x) => x.ref).join(" + ")} — RM ${matchedItem.amount.toFixed(2)} in all`
+          : null;
+      const amount = credit > 0 ? credit : debit;
+      const draft = l.matchKind ? undefined : drafts.find((d) => {
+        const days = (l.date.getTime() - d.date.getTime()) / 86_400_000;
+        return d.direction === (credit > 0 ? "IN" : "OUT") && Math.abs(d.amount - amount) < 0.005 && days >= -3 && days <= 14;
+      });
       const guess = !l.matchKind && credit > 0 ? guessResident(details, residents) : null;
       return {
         id: l.id, ref: l.ref, date: l.date, details: details.join(" · "), serial: l.serial, debit, credit,
         balance: Number(l.balance), isIn: credit > 0, amount: credit > 0 ? credit : debit, type: l.type,
         matched: matchedItem ? { ref: matchedItem.ref, label: matchedItem.label, href: matchedItem.href } : null,
+        together,
+        draft: draft ? { id: draft.id, number: draft.number, party: draft.party } : null,
         noEntry: l.matchKind === "none" ? (l.note ?? "") : null,
         candidates: l.matchKind ? [] : candidatesFor({ date: l.date, debit, credit, serial: l.serial }, free, guess?.resident.id)
           .slice(0, 4)

@@ -27,7 +27,7 @@ export default async function ExpenseByCategoryPage({
       lines: {
         where: {
           entry: {
-            status: "POSTED",
+            status: { not: "DRAFT" as const },
             ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
           },
         },

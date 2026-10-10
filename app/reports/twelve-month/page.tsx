@@ -34,7 +34,7 @@ export default async function TwelveMonthPage({
   const [summary, earliest] = await Promise.all([
     twelveMonthSummary(year),
     db.journalEntry.findFirst({
-      where: { associationId: DEFAULT_ASSOCIATION_ID, status: "POSTED" },
+      where: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "DRAFT" as const } },
       orderBy: { date: "asc" },
       select: { date: true },
     }),

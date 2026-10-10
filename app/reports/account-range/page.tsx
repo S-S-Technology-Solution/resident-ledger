@@ -30,7 +30,7 @@ export default async function AccountRangePage({
     where: { associationId: DEFAULT_ASSOCIATION_ID },
     include: {
       lines: {
-        where: { entry: { status: "POSTED", date: { lte: asOf } } },
+        where: { entry: { status: { not: "DRAFT" as const }, date: { lte: asOf } } },
         select: { debit: true, credit: true },
       },
     },
