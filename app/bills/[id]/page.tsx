@@ -25,10 +25,19 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const bill = await db.bill.findUnique({
     where: { id },
-    include: { supplier: true, payments: { orderBy: { date: "desc" } } },
+    include: { supplier: true, payments: { orderBy: { date: "desc" } }, lines: { orderBy: { lineNo: "asc" } } },
   });
   if (!bill) notFound();
-  const expense = await db.account.findUnique({ where: { id: bill.expenseAccountId } });
+  // Bills keyed before lines existed carry their one account on the bill itself.
+  const accounts = await db.account.findMany({
+    where: { id: { in: [bill.expenseAccountId, ...bill.lines.map((l) => l.accountId)] } },
+    select: { id: true, code: true, name: true },
+  });
+  const acc = new Map(accounts.map((a) => [a.id, a]));
+  const expense = acc.get(bill.expenseAccountId);
+  const lines = bill.lines.length
+    ? bill.lines.map((l) => ({ id: l.id, account: acc.get(l.accountId), description: l.description, rate: l.rate, amount: l.amount }))
+    : [{ id: "single", account: expense, description: "", rate: null, amount: bill.amount }];
 
   const amount = new Decimal(bill.amount.toString());
   const paid = new Decimal(bill.paid.toString());
@@ -43,7 +52,7 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
   const description = [
     bill.supplier.name,
     format(bill.date, "dd MMM yyyy"),
-    expense ? `${expense.code} — ${expense.name}` : null,
+    bill.lines.length <= 1 && expense ? `${expense.code} — ${expense.name}` : null,
     bill.dueDate ? `Due ${format(bill.dueDate, "dd MMM yyyy")}` : null,
   ].filter(Boolean).join(" · ");
 
@@ -71,6 +80,35 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
         <StatCard label="Paid" value={`RM ${fmtRM(paid)}`} />
         <StatCard label="Open" value={`RM ${fmtRM(open)}`} tone={open.gt(0) ? "bad" : "default"} />
       </div>
+
+      <DataCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-28">Account</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.map((l) => (
+              <TableRow key={l.id}>
+                <TableCell className="font-mono">{l.account?.code}</TableCell>
+                <TableCell>{l.account?.name}</TableCell>
+                <TableCell className="whitespace-normal">{l.description}</TableCell>
+                <TableCell className="text-right font-mono tabular">{fmtRM(l.amount)}</TableCell>
+              </TableRow>
+            ))}
+            {lines.length > 1 && (
+              <TableRow className="font-semibold">
+                <TableCell colSpan={3}>Invoice total</TableCell>
+                <TableCell className="text-right font-mono tabular">{fmtRM(amount)}</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </DataCard>
 
       <DataCard>
         {bill.payments.length === 0 ? (

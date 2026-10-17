@@ -15,30 +15,52 @@ import { draftsRequired, saveDraft } from "@/lib/drafts";
 import { releaseLineFor } from "@/lib/bank-statement/service";
 import { attempt } from "@/lib/action-server";
 
+const money = z.string().regex(/^\d*\.?\d{0,2}$/, "Enter amounts in ringgit and sen, e.g. 120.50");
 const billSchema = z.object({
   id: z.string().optional(),
-  supplierId: z.string().min(1),
-  invoiceNo: z.string().min(1),
+  supplierId: z.string().min(1, "Pick the supplier"),
+  invoiceNo: z.string().trim().min(1, "Enter the invoice number"),
   date: z.string().min(1),
   dueDate: z.string().optional(),
-  amount: z.string(),
-  expenseAccountId: z.string().min(1),
   description: z.string().optional(),
   kind: z.enum(["BILL", "CREDIT_NOTE"]).default("BILL"),
+  lines: z.array(z.object({
+    accountId: z.string().min(1, "Every line needs an account"),
+    description: z.string().optional(),
+    amount: money,
+    rate: z.string().regex(/^\d*\.?\d{0,4}$/).optional(),
+  })).min(1, "Add at least one line"),
 });
 
 export type BillInput = z.infer<typeof billSchema>;
 
+/**
+ * Records a supplier invoice with one or more lines — the main charge plus any
+ * others on the same invoice, such as a service charge. Posts one entry: each
+ * line debits its account, payables is credited with the invoice total.
+ */
 export async function createBill(input: BillInput) {
   return attempt(async () => {
     await requirePosting();
     const data = billSchema.parse(input);
-    const amount = new Decimal(data.amount);
-    if (amount.lte(0)) throw new Error("Amount must be positive");
+    const lines = data.lines.map((l) => ({ ...l, amount: new Decimal(l.amount || 0) }));
+    if (lines.some((l) => l.amount.lte(0))) throw new Error("Every line needs an amount above zero.");
+    // A percentage charge must be what it says on the lines without a rate.
+    const base = lines.filter((l) => !l.rate).reduce((s, l) => s.plus(l.amount), new Decimal(0));
+    for (const l of lines.filter((x) => x.rate)) {
+      const expected = base.times(l.rate!).div(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      if (!expected.eq(l.amount)) throw new Error(`${l.rate}% of RM ${base.toFixed(2)} is RM ${expected.toFixed(2)}, not RM ${l.amount.toFixed(2)}.`);
+    }
+    const amount = lines.reduce((s, l) => s.plus(l.amount), new Decimal(0));
+
+    const duplicate = await db.bill.findFirst({
+      where: { associationId: DEFAULT_ASSOCIATION_ID, supplierId: data.supplierId, invoiceNo: data.invoiceNo, status: { not: "VOIDED" } },
+    });
+    if (duplicate) throw new Error(`Invoice ${data.invoiceNo} from this supplier is already recorded.`);
 
     const ap = await controlAccount("AP");
-    const expense = await db.account.findUnique({ where: { id: data.expenseAccountId } });
-    if (!expense) throw new Error("Expense account not found");
+    const accounts = await db.account.findMany({ where: { id: { in: lines.map((l) => l.accountId) } } });
+    if (accounts.length !== new Set(lines.map((l) => l.accountId)).size) throw new Error("An account on this bill no longer exists.");
 
     const { entryNo, batchId } = await prepareEntry(new Date(data.date), "bill");
     const bill = await db.$transaction(async (tx) => {
@@ -55,8 +77,10 @@ export async function createBill(input: BillInput) {
           postedAt: new Date(),
           lines: {
             create: [
-              { accountId: expense.id, debit: amount.toFixed(2), credit: "0", lineNo: 1 },
-              { accountId: ap.id, debit: "0", credit: amount.toFixed(2), lineNo: 2 },
+              ...lines.map((l, i) => ({
+                accountId: l.accountId, debit: l.amount.toFixed(2), credit: "0", memo: l.description || null, lineNo: i + 1,
+              })),
+              { accountId: ap.id, debit: "0", credit: amount.toFixed(2), lineNo: lines.length + 1 },
             ],
           },
         },
@@ -69,10 +93,16 @@ export async function createBill(input: BillInput) {
           date: new Date(data.date),
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
           amount: amount.toFixed(2),
-          expenseAccountId: expense.id,
+          expenseAccountId: lines[0].accountId,
           status: "UNPAID",
           kind: data.kind,
           entryId: entry.id,
+          lines: {
+            create: lines.map((l, i) => ({
+              lineNo: i + 1, accountId: l.accountId, description: l.description?.trim() ?? "",
+              amount: l.amount.toFixed(2), rate: l.rate || null,
+            })),
+          },
         },
       });
       await tx.journalEntry.update({ where: { id: entry.id }, data: { sourceId: b.id } });

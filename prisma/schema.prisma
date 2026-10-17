@@ -376,8 +376,27 @@ model Bill {
   createdAt        DateTime    @default(now())
 
   payments BillPayment[]
+  lines    BillLine[]
 
   @@index([supplierId])
+}
+
+// One line of a supplier invoice: the main charge, and any others on the same
+// invoice such as a service charge. Bills keyed before lines existed have none
+// and carry their single account in Bill.expenseAccountId, which otherwise
+// holds the first line's account.
+model BillLine {
+  id          String  @id @default(cuid())
+  billId      String
+  bill        Bill    @relation(fields: [billId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  accountId   String
+  description String  @default("")
+  amount      Decimal @db.Decimal(15, 2)
+  // For a charge worked out on the lines above, e.g. 8 for "service charge 8%".
+  rate        Decimal? @db.Decimal(7, 4)
+
+  @@index([billId])
 }
 
 model BillPayment {
