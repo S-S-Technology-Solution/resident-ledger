@@ -22,7 +22,15 @@ export async function nextCashRefNo(
   return nextNumber(direction === "IN" ? "CASH_IN" : "CASH_OUT", date, associationId);
 }
 
-export type CashLineInput = { accountId: string; description?: string; amount: string };
+// `returned` marks a payment voucher line taken back, e.g. a cheque the bank
+// returned: it reverses the expense and puts the money back in the bank, and
+// shows as a minus line on the voucher.
+export type CashLineInput = { accountId: string; description?: string; amount: string; returned?: boolean };
+
+/** A voucher's net figure: payments less returned lines. Negative means money came back in. */
+export function cashNet(lines: CashLineInput[]) {
+  return lines.reduce((s, l) => (l.returned ? s.minus(l.amount || 0) : s.plus(l.amount || 0)), new Decimal(0));
+}
 
 export type CashEntryInput = {
   direction: CashDirection;
@@ -50,12 +58,15 @@ export async function createCashEntry(
     ? input.lines
     : input.accountId && input.amount ? [{ accountId: input.accountId, amount: input.amount, description: "" }] : [];
   if (!rawLines.length) throw new Error("Add at least one account line.");
+  if (input.direction === "IN" && rawLines.some((l) => l.returned)) throw new Error("Only payment voucher lines can be marked returned.");
   const lines = rawLines.map((l, i) => {
     const amount = new Decimal(l.amount || 0);
     if (amount.lte(0)) throw new Error(`Line ${i + 1}: the amount must be greater than zero.`);
-    return { ...l, amount };
+    // Signed: a returned line counts against the voucher.
+    return { ...l, amount: l.returned ? amount.neg() : amount };
   });
   const amount = lines.reduce((s, l) => s.plus(l.amount), new Decimal(0));
+  if (amount.isZero()) throw new Error("The lines cancel out to RM 0.00 — nothing goes through the bank. Key the payment and the return separately.");
 
   const accounts = await db.account.findMany({ where: { id: { in: lines.map((l) => l.accountId) } } });
   const byId = new Map(accounts.map((a) => [a.id, a]));
@@ -82,13 +93,19 @@ export async function createCashEntry(
   const isIn = input.direction === "IN";
 
   return db.$transaction(async (tx) => {
-    const bankLine = { accountId: bankOrCash.id, debit: isIn ? amount.toFixed(2) : "0", credit: isIn ? "0" : amount.toFixed(2) };
-    const accountLines = lines.map((l) => ({
-      accountId: l.accountId,
-      debit: isIn ? "0" : l.amount.toFixed(2),
-      credit: isIn ? l.amount.toFixed(2) : "0",
-      memo: l.description || null,
-    }));
+    // Money in when it is a receipt, or a voucher whose returned lines outweigh its payments.
+    const intoBank = isIn || amount.lt(0);
+    const bankLine = { accountId: bankOrCash.id, debit: intoBank ? amount.abs().toFixed(2) : "0", credit: intoBank ? "0" : amount.abs().toFixed(2) };
+    const accountLines = lines.map((l) => {
+      // Receipts credit their accounts; voucher lines debit theirs, returned lines credit them back.
+      const credit = isIn || l.amount.lt(0);
+      return {
+        accountId: l.accountId,
+        debit: credit ? "0" : l.amount.abs().toFixed(2),
+        credit: credit ? l.amount.abs().toFixed(2) : "0",
+        memo: l.description || (l.amount.lt(0) ? "Returned" : null),
+      };
+    });
     const entry = await tx.journalEntry.create({
       data: {
         associationId,

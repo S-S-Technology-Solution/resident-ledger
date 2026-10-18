@@ -31,9 +31,15 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
   });
   const acc = new Map(lineAccounts.map((a) => [a.id, a]));
   const lines = entry.lines.length
-    ? entry.lines.map((l) => ({ id: l.id, code: acc.get(l.accountId)?.code ?? "", name: acc.get(l.accountId)?.name ?? "", description: l.description, amount: Number(l.amount) }))
+    ? entry.lines.map((l) => ({
+        id: l.id, code: acc.get(l.accountId)?.code ?? "", name: acc.get(l.accountId)?.name ?? "",
+        description: Number(l.amount) < 0 && !/return/i.test(l.description) ? `${l.description} (returned)`.trim() : l.description,
+        amount: Number(l.amount),
+      }))
     : [{ id: "single", code: entry.account.code, name: entry.account.name, description: "", amount: Number(entry.amount) }];
   const amt = Number(entry.amount);
+  // Negative: a voucher of returned lines, money back into the bank.
+  const signed = (v: number) => (v < 0 ? `−${fmtRM(-v)}` : fmtRM(v));
   const isIn = entry.direction === "IN";
   const title = isIn ? "Receipt" : "Payment Voucher";
 
@@ -58,7 +64,7 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
         </div>
         <div className="flex gap-2">
           <PrintButton />
-          {!isIn && !entry.voided && entry.method === "BANK" && (
+          {!isIn && amt > 0 && !entry.voided && entry.method === "BANK" && (
             <Button variant="outline" asChild>
               <Link href={`/cheque/cash/${entry.id}`}>Print cheque</Link>
             </Button>
@@ -109,8 +115,8 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
           </div>
           <div className="sm:text-right">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Amount</div>
-            <div className="mt-1 font-mono text-4xl font-bold tabular">RM {fmtRM(amt)}</div>
-            <div className="mt-1 text-sm font-medium text-foreground/80">{amountInWords(amt)}</div>
+            <div className="mt-1 font-mono text-4xl font-bold tabular">RM {signed(amt)}</div>
+            <div className="mt-1 text-sm font-medium text-foreground/80">{amountInWords(Math.abs(amt))}{amt < 0 ? " — returned to the bank" : ""}</div>
           </div>
         </div>
 
@@ -135,14 +141,14 @@ export default async function CashEntryPage({ params }: { params: Promise<{ id: 
                   <td className="py-1.5 font-mono text-xs">{l.code}</td>
                   <td className="py-1.5">{l.name}</td>
                   <td className="py-1.5 text-muted-foreground">{l.description}</td>
-                  <td className="py-1.5 text-right font-mono tabular">{fmtRM(l.amount)}</td>
+                  <td className="py-1.5 text-right font-mono tabular">{signed(l.amount)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
                 <td colSpan={3} className="pt-2 text-right text-xs font-medium">Total</td>
-                <td className="pt-2 text-right font-mono font-semibold tabular">{fmtRM(amt)}</td>
+                <td className="pt-2 text-right font-mono font-semibold tabular">{signed(amt)}</td>
               </tr>
             </tfoot>
           </table>

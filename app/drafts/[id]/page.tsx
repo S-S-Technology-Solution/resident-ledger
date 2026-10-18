@@ -68,9 +68,16 @@ export default async function DraftPage({ params }: { params: Promise<{ id: stri
       { label: "Cheque no.", value: p.chequeNo || "—" },
     );
     const lines = await Promise.all((p.lines ?? []).map(async (l) => ({ ...l, name: await acc(l.accountId) })));
-    detail = { cols: ["Account", "Description", "Amount"], rows: lines.map((l) => [l.name, l.description ?? "", fmtRM(Number(l.amount))]) };
-    const bankLine = { account: `${bank.code} ${bank.name}`, debit: isIn ? amount : 0, credit: isIn ? 0 : amount };
-    const accLines = lines.map((l) => ({ account: l.name, debit: isIn ? 0 : Number(l.amount), credit: isIn ? Number(l.amount) : 0 }));
+    detail = { cols: ["Account", "Description", "Amount"], rows: lines.map((l) => [
+      l.name, l.returned && !/return/i.test(l.description ?? "") ? `${l.description ?? ""} (returned)`.trim() : (l.description ?? ""), `${l.returned ? "−" : ""}${fmtRM(Number(l.amount))}`,
+    ]) };
+    // Returned lines credit their account back; a voucher netting negative puts money into the bank.
+    const intoBank = isIn || amount < 0;
+    const bankLine = { account: `${bank.code} ${bank.name}`, debit: intoBank ? Math.abs(amount) : 0, credit: intoBank ? 0 : Math.abs(amount) };
+    const accLines = lines.map((l) => {
+      const credit = isIn || !!l.returned;
+      return { account: l.name, debit: credit ? 0 : Number(l.amount), credit: credit ? Number(l.amount) : 0 };
+    });
     journal = isIn ? [bankLine, ...accLines] : [...accLines, bankLine];
   } else {
     const p = draft.payload as unknown as SupplierPaymentInput;

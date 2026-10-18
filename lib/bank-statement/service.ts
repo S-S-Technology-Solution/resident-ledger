@@ -174,8 +174,10 @@ export async function bookItems(associationId = DEFAULT_ASSOCIATION_ID, { includ
       ref: r.voucherNo ?? r.invoiceNo ?? "Refund", label: `Refund — ${r.resident.ownerName}, ${r.resident.unitAddress}`,
       bankRef: null, chequeNo: r.chequeNo, residentId: r.residentId, href: `/charges/${r.id}`, voidedOn: voidedOn(r),
     })),
+    // A voucher of returned lines (e.g. a cheque the bank sent back) is money in.
     ...cash.map((c) => ({
-      kind: "cashEntry" as const, id: c.id, date: c.date, amount: Number(c.amount), direction: c.direction,
+      kind: "cashEntry" as const, id: c.id, date: c.date, amount: Math.abs(Number(c.amount)),
+      direction: Number(c.amount) < 0 ? (c.direction === "OUT" ? "IN" as const : "OUT" as const) : c.direction,
       ref: c.refNo, label: c.counterparty ? `${c.counterparty} — ${c.description}` : c.description,
       bankRef: c.bankRef, chequeNo: c.chequeNo, href: `/cash-book/${c.id}`, voidedOn: voidedOn(c),
     })),
@@ -531,10 +533,15 @@ export async function bankDrafts(associationId = DEFAULT_ASSOCIATION_ID) {
   const drafts = await db.draft.findMany({ where: { associationId } });
   return drafts
     .filter((d) => ((d.payload as { input?: { method?: string } }).input?.method ?? "BANK") === "BANK")
-    .map((d) => ({
-      id: d.id, number: d.number, date: d.date, amount: Number(d.amount), party: d.party,
-      direction: (d.kind === "receipt" ? "IN" : d.kind === "supplierPayment" ? "OUT" : d.direction) as "IN" | "OUT",
-    }));
+    .map((d) => {
+      const direction = (d.kind === "receipt" ? "IN" : d.kind === "supplierPayment" ? "OUT" : d.direction) as "IN" | "OUT";
+      const amount = Number(d.amount);
+      // A voucher draft that nets negative (returned lines) brings money in.
+      return {
+        id: d.id, number: d.number, date: d.date, amount: Math.abs(amount), party: d.party,
+        direction: amount < 0 ? (direction === "OUT" ? "IN" as const : "OUT" as const) : direction,
+      };
+    });
 }
 
 /** Unmatched lines and free book items that could be matched together with a line. */

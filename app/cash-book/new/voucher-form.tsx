@@ -17,7 +17,7 @@ import { updateDraft } from "@/app/drafts/actions";
 import type { CashEntryInput } from "@/lib/cash-book";
 
 type Account = { id: string; code: string; name: string };
-type Line = { key: number; accountId: string; description: string; amount: string };
+type Line = { key: number; accountId: string; description: string; amount: string; returned: boolean };
 
 export function VoucherForm({
   direction, accounts, suggestedRefNo, draftId, initial,
@@ -38,14 +38,19 @@ export function VoucherForm({
   const [bankRef, setBankRef] = useState(initial?.bankRef ?? "");
   const [lines, setLines] = useState<Line[]>(
     initial?.lines?.length
-      ? initial.lines.map((l, i) => ({ key: i + 1, accountId: l.accountId, description: l.description ?? "", amount: l.amount }))
-      : [{ key: 1, accountId: "", description: "", amount: "" }],
+      ? initial.lines.map((l, i) => ({ key: i + 1, accountId: l.accountId, description: l.description ?? "", amount: l.amount, returned: !!l.returned }))
+      : [{ key: 1, accountId: "", description: "", amount: "", returned: false }],
   );
 
+  const cols = isIn ? "grid-cols-[1fr_1fr_9rem_2.5rem]" : "grid-cols-[1fr_1fr_6rem_9rem_2.5rem]";
   const options = accounts.map((a) => ({ value: a.id, label: `${a.code} — ${a.name}` }));
-  const total = lines.reduce((s, l) => s.plus(/^\d*\.?\d{0,2}$/.test(l.amount) && l.amount ? l.amount : 0), new Decimal(0));
+  // Returned lines (a cheque the bank sent back) count as minus; a negative total is money back in.
+  const total = lines.reduce((s, l) => {
+    const v = /^\d*\.?\d{0,2}$/.test(l.amount) && l.amount ? l.amount : 0;
+    return l.returned ? s.minus(v) : s.plus(v);
+  }, new Decimal(0));
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const ready = refNo.trim() && description.trim() && lines.every((l) => l.accountId && l.amount) && total.gt(0);
+  const ready = refNo.trim() && description.trim() && lines.every((l) => l.accountId && l.amount) && (isIn ? total.gt(0) : !total.isZero());
 
   function submit() {
     start(async () => {
@@ -54,7 +59,7 @@ export function VoucherForm({
           direction, date, method, refNo,
           description, counterparty: counterparty || undefined, paymentFor: paymentFor || undefined,
           chequeNo: chequeNo || undefined, bankRef: bankRef || undefined,
-          lines: lines.map(({ accountId, description, amount }) => ({ accountId, description, amount })),
+          lines: lines.map(({ accountId, description, amount, returned }) => ({ accountId, description, amount, ...(returned ? { returned } : {}) })),
         };
         if (draftId) {
           await unwrap(updateDraft(draftId, { kind: "cashEntry", input }));
@@ -121,14 +126,21 @@ export function VoucherForm({
       </div>
 
       <div className="rounded-lg border bg-card">
-        <div className="grid grid-cols-[1fr_1fr_9rem_2.5rem] gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-          <span>{isIn ? "Income account" : "Expense account"}</span><span>Line description</span><span className="text-right">Amount (RM)</span><span />
+        <div className={`grid ${cols} gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground`}>
+          <span>{isIn ? "Income account" : "Expense account"}</span><span>Line description</span>
+          {!isIn && <span className="text-center" title="Tick for a cheque the bank returned — it comes off the voucher">Returned (−)</span>}
+          <span className="text-right">Amount (RM)</span><span />
         </div>
         {lines.map((l) => (
-          <div key={l.key} className="grid grid-cols-[1fr_1fr_9rem_2.5rem] items-center gap-2 border-b px-3 py-2 last:border-0">
+          <div key={l.key} className={`grid ${cols} items-center gap-2 border-b px-3 py-2 last:border-0 ${l.returned ? "bg-rose-50/60" : ""}`}>
             <Combobox options={options} value={l.accountId} onChange={(v) => update(l.key, { accountId: v })} placeholder="Search account" />
-            <Input value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} placeholder="Optional" />
-            <Input inputMode="decimal" className="text-right font-mono" value={l.amount}
+            <Input value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} placeholder={l.returned ? "e.g. Cheque 936 returned" : "Optional"} />
+            {!isIn && (
+              <label className="flex justify-center">
+                <input type="checkbox" aria-label="Returned" checked={l.returned} onChange={(e) => update(l.key, { returned: e.target.checked })} />
+              </label>
+            )}
+            <Input inputMode="decimal" className={`text-right font-mono ${l.returned ? "text-rose-700" : ""}`} value={l.amount}
               onChange={(e) => { if (!e.target.value || /^\d*\.?\d{0,2}$/.test(e.target.value)) update(l.key, { amount: e.target.value }); }} />
             <Button type="button" variant="ghost" size="icon" aria-label="Remove line" disabled={lines.length === 1}
               onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}>
@@ -138,12 +150,17 @@ export function VoucherForm({
         ))}
         <div className="flex items-center justify-between px-3 py-2">
           <Button type="button" variant="outline" size="sm"
-            onClick={() => setLines((ls) => [...ls, { key: Math.max(...ls.map((x) => x.key)) + 1, accountId: "", description: "", amount: "" }])}>
+            onClick={() => setLines((ls) => [...ls, { key: Math.max(...ls.map((x) => x.key)) + 1, accountId: "", description: "", amount: "", returned: false }])}>
             <Plus className="mr-1 h-4 w-4" /> Add line
           </Button>
-          <span className="text-sm">Total <span className="ml-2 font-mono text-base font-semibold tabular">RM {fmtRM(total.toNumber())}</span></span>
+          <span className="text-sm">Total <span className={`ml-2 font-mono text-base font-semibold tabular ${total.lt(0) ? "text-rose-700" : ""}`}>RM {total.lt(0) ? "−" : ""}{fmtRM(total.abs().toNumber())}</span></span>
         </div>
       </div>
+      {!isIn && total.lt(0) && (
+        <p className="text-xs text-muted-foreground">
+          This voucher brings RM {fmtRM(total.abs().toNumber())}{" "}back into the bank: the returned amount comes off the expense account. Match it to the bank&apos;s &ldquo;cheque returned&rdquo; line.
+        </p>
+      )}
 
       <div className="flex justify-end">
         <Button disabled={pending || !ready} onClick={submit}>{pending ? "Saving…" : draftId ? "Save changes" : isIn ? "Save receipt" : "Save voucher"}</Button>

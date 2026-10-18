@@ -4,7 +4,7 @@ import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { numberInUse, type SequenceKey } from "./numbering";
 import { receiptSchema, postReceipt, type ReceiptInput } from "./receipt-posting";
-import { createCashEntry, type CashEntryInput } from "./cash-book";
+import { cashNet, createCashEntry, type CashEntryInput } from "./cash-book";
 import { supplierPaymentSchema, postSupplierPayment, type SupplierPaymentInput } from "./bill-posting";
 
 /**
@@ -52,9 +52,12 @@ async function describe(p: DraftPayload, associationId: string, draftId?: string
     if (!input.description?.trim()) throw new Error("Describe what this is for.");
     const lines = input.lines ?? [];
     if (!lines.length || lines.some((l) => !l.accountId || new Decimal(l.amount || 0).lte(0))) throw new Error("Every line needs an account and an amount.");
+    if (input.direction === "IN" && lines.some((l) => l.returned)) throw new Error("Only payment voucher lines can be marked returned.");
     const accounts = await db.account.findMany({ where: { id: { in: lines.map((l) => l.accountId) } } });
     if (accounts.length !== new Set(lines.map((l) => l.accountId)).size) throw new Error("An account on this voucher no longer exists.");
-    amount = sum(lines);
+    // Net of returned lines; negative when the voucher brings money back in.
+    amount = cashNet(lines);
+    if (amount.isZero()) throw new Error("The lines cancel out to RM 0.00 — key the payment and the return separately.");
     party = input.counterparty || input.description;
     direction = input.direction;
     key = input.direction === "IN" ? "CASH_IN" : "CASH_OUT"; date = input.date;
@@ -78,7 +81,7 @@ async function describe(p: DraftPayload, associationId: string, draftId?: string
     p.input = { ...input, voucherNo: number, allocations };
   }
 
-  if (amount.lte(0)) throw new Error("The amount must be greater than zero.");
+  if (p.kind !== "cashEntry" && amount.lte(0)) throw new Error("The amount must be greater than zero.");
   if (await numberInUse(key, number, associationId, draftId)) {
     throw new Error(`${number} is already in the system or held by another draft. Check the number in the book.`);
   }

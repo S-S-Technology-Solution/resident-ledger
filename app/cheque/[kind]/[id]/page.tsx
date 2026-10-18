@@ -42,7 +42,7 @@ export default async function ChequePage({
     reference = payment.voucherNo ?? payment.bill.invoiceNo;
   } else if (kind === "cash") {
     const entry = await db.cashEntry.findUnique({ where: { id } });
-    if (!entry || entry.direction !== "OUT") notFound();
+    if (!entry || entry.direction !== "OUT" || Number(entry.amount) <= 0) notFound();
     payee = entry.counterparty || entry.description;
     amount = Number(entry.amount);
     date = entry.date;
