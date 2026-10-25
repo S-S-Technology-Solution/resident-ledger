@@ -11,8 +11,11 @@ export type Column = {
 /**
  * A row's look, set with the reserved `__style` key: "heading" for a section
  * title, "total" for a subtotal, "muted" for a note. Not shown as a column.
+ * The statement layout uses "label" (a plain line or section title), "item"
+ * (an indented detail line), "subtotal" (rule above the last figure) and
+ * "grand" (rule across, figure double-underlined).
  */
-export type RowStyle = "heading" | "total" | "muted";
+export type RowStyle = "heading" | "total" | "muted" | "label" | "item" | "subtotal" | "grand";
 export type Row = Record<string, string | number | null> & { __style?: RowStyle };
 
 export type ReportData = {
@@ -27,6 +30,11 @@ export type ReportData = {
   landscape?: boolean;
   // Sign-off lines printed after the table, e.g. ["Prepared by", "Checked by"].
   signatures?: string[];
+  // "statement": an accountant's statement in the style of the old Million
+  // reports — centred title, no column headings, a ruled account line
+  // (accountLine left / right) above the rows.
+  layout?: "table" | "statement";
+  accountLine?: { left: string; right: string };
 };
 
 /** One exportable screen or report: who may download it and how it is built. */

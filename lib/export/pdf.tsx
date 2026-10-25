@@ -54,7 +54,91 @@ function formatMoney(v: unknown): string {
   return n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const st = StyleSheet.create({
+  page: { paddingTop: 36, paddingBottom: 40, paddingHorizontal: 36, fontSize: 9, fontFamily: "Helvetica", color: "#000" },
+  title: { fontSize: 15, fontFamily: "Helvetica-Bold", textAlign: "center" },
+  subtitle: { fontSize: 10, fontFamily: "Helvetica-Bold", textAlign: "center", marginTop: 6 },
+  top: { flexDirection: "row", justifyContent: "space-between", marginTop: 22 },
+  bold: { fontFamily: "Helvetica-Bold" },
+  account: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, paddingBottom: 5, borderBottomWidth: 0.75, borderColor: "#000" },
+  row: { flexDirection: "row", paddingVertical: 3 },
+  cell: { fontSize: 9, paddingHorizontal: 2 },
+});
+
+/** An accountant's statement in the Million style: centred heading, ruled account line, no column headings. */
+function statementPdf(data: ReportData) {
+  const totalWeight = data.columns.reduce((s, c) => s + (c.width ?? 1), 0);
+  const flex = (c: { width?: number }) => ({ flex: (c.width ?? 1) / totalWeight });
+  const last = data.columns.length - 1;
+  return (
+    <Document title={data.title} author="ResidentLedger">
+      <Page size="A4" orientation={data.landscape ? "landscape" : "portrait"} style={st.page} wrap>
+        <Text style={st.title}>{data.title}</Text>
+        {data.subtitle && <Text style={st.subtitle}>{data.subtitle}</Text>}
+        <View style={st.top} fixed>
+          <Text style={st.bold}>{data.associationName.toUpperCase()}</Text>
+          <Text render={({ pageNumber }) => `Page ${pageNumber}`} />
+        </View>
+        {data.accountLine && (
+          <View style={st.account} fixed>
+            <Text style={st.bold}>{data.accountLine.left}</Text>
+            <Text style={st.bold}>{data.accountLine.right}</Text>
+          </View>
+        )}
+        {data.rows.map((r, i) => {
+          const label = r.__style === "label" || r.__style === "grand";
+          return (
+            <View
+              key={i}
+              wrap={false}
+              style={[
+                st.row,
+                label ? { marginTop: 8 } : {},
+                r.__style === "grand" ? { borderTopWidth: 0.75, borderColor: "#000", paddingTop: 5 } : {},
+              ]}
+            >
+              {/* A title line runs across every column but the figure. */}
+              {label && (
+                <Text style={[st.cell, { flex: 1 - (data.columns[last].width ?? 1) / totalWeight }]}>{String(r[data.columns[0].key] ?? "")}</Text>
+              )}
+              {data.columns.map((c, ci) => {
+                if (label && ci < last) return null;
+                const raw = r[c.key];
+                const val = c.money ? formatMoney(raw) : raw == null ? "" : String(raw);
+                const figure = ci === last;
+                // Double underline: the figure's own rule plus a second one just below it.
+                if (figure && r.__style === "grand" && val) {
+                  return (
+                    <View key={c.key} style={[flex(c), { borderBottomWidth: 0.75, borderColor: "#000", paddingBottom: 1.5 }]}>
+                      <Text style={[st.cell, { textAlign: "right", borderBottomWidth: 0.75, borderColor: "#000", paddingBottom: 2 }]}>{val}</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <Text
+                    key={c.key}
+                    style={[
+                      st.cell,
+                      flex(c),
+                      { textAlign: c.align ?? (c.money ? "right" : "left") },
+                      r.__style === "item" && ci === 0 ? { paddingLeft: 10 } : {},
+                      figure && r.__style === "subtotal" && val ? { borderTopWidth: 0.75, borderColor: "#000", paddingTop: 3 } : {},
+                    ]}
+                  >
+                    {val}
+                  </Text>
+                );
+              })}
+            </View>
+          );
+        })}
+      </Page>
+    </Document>
+  );
+}
+
 export async function buildPdf(data: ReportData): Promise<Buffer> {
+  if (data.layout === "statement") return renderToBuffer(statementPdf(data));
   const totalWeight = data.columns.reduce((s, c) => s + (c.width ?? 1), 0);
   const flex = (c: { width?: number }) => ({ flex: (c.width ?? 1) / totalWeight });
 

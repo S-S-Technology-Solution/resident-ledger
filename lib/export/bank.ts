@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 import { db } from "../db";
 import { DEFAULT_ASSOCIATION_ID } from "../association";
 import { bookItems, reconciliation, type Pick } from "../bank-statement/service";
+import { controlAccount } from "../control-accounts";
 import { base, numCol, ymd } from "./helpers";
 import type { ExportDef, ReportData, Row } from "./types";
 
@@ -14,58 +15,75 @@ async function statementFor(sp: URLSearchParams) {
 const period = (s: { bank: string; accountNo: string; periodFrom: Date; periodTo: Date; reconciledAt: Date | null }) =>
   `${s.bank} ${s.accountNo} · statement ${ymd(s.periodFrom)} to ${ymd(s.periodTo)}${s.reconciledAt ? ` · reconciled ${ymd(s.reconciledAt)}` : " · not yet signed off"}`;
 
+const dmy = (d: Date) => `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+
 /**
- * The bank reconciliation statement as at the statement's closing date, laid
- * out as on screen: bank balance, items in the books not yet through the bank,
- * bank items not in the books, adjusted balance against the cash book.
+ * The bank reconciliation statement as at the statement's closing date, in the
+ * layout of the association's old Million reports: bank balance, then only the
+ * sections that have items (each listed with its subtotal), then the balance
+ * as per bank account, double-underlined.
  */
 async function bankReconciliation(sp: URLSearchParams): Promise<ReportData> {
   const s = await statementFor(sp);
-  const rec = await reconciliation(s.id);
+  const [rec, bank] = await Promise.all([reconciliation(s.id), controlAccount("BANK", s.associationId)]);
   const rows: Row[] = [];
-  const line = (particulars: string, total: Decimal | number, style?: Row["__style"]) =>
-    rows.push({ date: "", ref: "", particulars, amount: "", total: new Decimal(total).toNumber() + 0, ...(style ? { __style: style } : {}) });
-  const items = (title: string, xs: { date: Date; ref: string; label: string; amount: number }[], sign: 1 | -1) => {
-    rows.push({ date: "", ref: "", particulars: title, amount: "", total: "", __style: "heading" });
-    for (const i of xs) rows.push({ date: ymd(i.date), ref: i.ref, particulars: i.label, amount: i.amount, total: "" });
-    if (!xs.length) rows.push({ date: "", ref: "", particulars: "None", amount: "", total: "", __style: "muted" });
-    line(`Total ${title.replace(/^(Add|Less): /, "").toLowerCase()}`, xs.reduce((t, i) => t.plus(i.amount), new Decimal(0)).times(sign), "total");
+  const blank = { date: "", ref: "", party: "", invoice: "", cheque: "" };
+  const label = (text: string, amount: Decimal | null, style: Row["__style"] = "label") =>
+    rows.push({ ...blank, date: text, amount: amount === null ? "" : amount.toNumber() + 0, __style: style });
+  const section = (title: string, list: Omit<Row, "amount" | "__style">[], amounts: number[]) => {
+    if (!list.length) return;
+    label(title, null);
+    list.forEach((r, i) => rows.push({ ...blank, ...r, amount: amounts[i], __style: "item" }));
+    rows.push({ ...blank, amount: amounts.reduce((t, a) => t.plus(a), new Decimal(0)).toNumber() + 0, __style: "subtotal" });
   };
-  const bankLines = (title: string, ls: typeof rec.unmatched) => {
-    if (!ls.length) return;
-    rows.push({ date: "", ref: "", particulars: title, amount: "", total: "", __style: "heading" });
-    for (const l of ls) {
-      rows.push({
-        date: ymd(l.date), ref: l.ref, particulars: `${l.type}${l.note ? ` — ${l.note}` : ""}`,
-        amount: new Decimal(l.credit.toString()).minus(l.debit.toString()).toNumber(), total: "",
-      });
-    }
-    // Lines through the bank but not in the books are taken out to reach the book figure.
-    line("Total (net)", ls.reduce((t, l) => t.minus(l.credit.toString()).plus(l.debit.toString()), new Decimal(0)), "total");
-  };
+  const cheque = (no: string | null) => (!no ? "" : /^[A-Z]{2,5}\s/i.test(no) ? no : `${s.bank} ${no}`);
+  const book = (xs: typeof rec.unpresented) =>
+    xs.map((i) => {
+      // "Supplier — INV1, INV2" for a supplier payment; otherwise the label is the payee.
+      const [party, rest] = i.label.split(" — ");
+      return {
+        date: dmy(i.date), ref: i.ref,
+        party: i.kind === "billPayment" ? party : i.kind === "bf" ? (rest ?? i.label) : i.label,
+        invoice: i.kind === "billPayment" ? rest ?? "" : i.kind === "bf" ? "B/F" : "",
+        cheque: cheque(i.chequeNo ?? i.bankRef),
+      };
+    });
+  // Statement lines not in the books are taken off (credits) or added back (debits): shown as credit less debit.
+  const lines = (ls: typeof rec.unmatched) =>
+    ls.map((l) => ({ date: dmy(l.date), ref: l.ref, party: `${l.type}${l.note ? ` — ${l.note}` : ""}`, invoice: "", cheque: l.serial ?? "" }));
+  const net = (ls: typeof rec.unmatched) => ls.map((l) => new Decimal(l.credit.toString()).minus(l.debit.toString()).toNumber());
 
-  line("Balance as per bank statement", rec.bankBalance, "total");
-  items("Add: deposits in the books, not yet credited by the bank", rec.depositsInTransit, 1);
-  items("Less: payments in the books, not yet presented", rec.unpresented, -1);
-  bankLines("Bank items with no book entry", rec.noEntry);
-  bankLines("Statement lines not yet matched", rec.unmatched);
-  line("Adjusted bank balance", rec.adjusted, "total");
-  line("Balance as per cash book", rec.bookBalance);
-  line("Difference", rec.difference, "total");
+  const byDate = <T extends { date: Date; ref: string }>(xs: T[]) =>
+    [...xs].sort((x, y) => x.date.getTime() - y.date.getTime() || x.ref.localeCompare(y.ref));
+  const deposits = byDate(rec.depositsInTransit), unpresented = byDate(rec.unpresented);
+
+  label("BALANCE AS PER BANK STATEMENT", rec.bankBalance);
+  section("ADD : DEPOSITS NOT YET CREDITED", book(deposits), deposits.map((i) => i.amount));
+  section("LESS : UNPRESENTED CHEQUES", book(unpresented), unpresented.map((i) => i.amount));
+  section("LESS : BANK ITEMS WITH NO BOOK ENTRY (NET)", lines(rec.noEntry), net(rec.noEntry));
+  section("LESS : STATEMENT LINES NOT YET MATCHED (NET)", lines(rec.unmatched), net(rec.unmatched));
+  label("BALANCE AS PER BANK ACCOUNT", rec.adjusted, "grand");
+  // Only when bank and books disagree: show the cash book figure and the gap.
+  if (!rec.difference.abs().lt(0.005)) {
+    label("BALANCE AS PER CASH BOOK", rec.bookBalance);
+    label("UNRECONCILED DIFFERENCE", rec.difference);
+  }
 
   return {
     ...(await base()),
-    title: `Bank Reconciliation as at ${ymd(rec.asAt)}`,
-    subtitle: period(s),
+    title: "BANK RECONCILIATION",
+    subtitle: `As At ${dmy(rec.asAt)}`,
+    layout: "statement",
+    accountLine: { left: `${bank.code}        ${bank.name}`, right: "MYR" },
     columns: [
       { key: "date", header: "Date", width: 1.1 },
-      { key: "ref", header: "Ref.", width: 1.2 },
-      { key: "particulars", header: "Particulars", width: 4.6 },
-      numCol("amount", "RM", 1.3),
-      numCol("total", "RM", 1.4),
+      { key: "ref", header: "Ref.", width: 1.3 },
+      { key: "party", header: "Particulars", width: 3.4 },
+      { key: "invoice", header: "Invoice", width: 1.2 },
+      { key: "cheque", header: "Cheque", width: 1.2 },
+      numCol("amount", "MYR", 1.3),
     ],
     rows,
-    signatures: ["Prepared by", "Checked by", "Approved by"],
   };
 }
 
