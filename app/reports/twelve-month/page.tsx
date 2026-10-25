@@ -1,26 +1,15 @@
 import Link from "next/link";
-import Decimal from "decimal.js";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
-import { twelveMonthSummary } from "@/lib/subsidiary-ledger";
+import { twelveMonthSummary, twelveMonthTotal, MONTHS, TWELVE_MONTH_ROWS } from "@/lib/subsidiary-ledger";
 import { fmtRM } from "@/lib/money";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
+import { ExportButtons } from "@/components/export-buttons";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-const ROWS: { key: "sales" | "purchases" | "receipt" | "payment" | "expenses" | "cashBalance"; label: string; emphasis?: boolean }[] = [
-  { key: "sales", label: "Sales" },
-  { key: "purchases", label: "Purchases" },
-  { key: "receipt", label: "Receipts" },
-  { key: "payment", label: "Payments" },
-  { key: "expenses", label: "Expenses" },
-  { key: "cashBalance", label: "Cash & bank balance", emphasis: true },
-];
 
 export default async function TwelveMonthPage({
   searchParams,
@@ -49,6 +38,7 @@ export default async function TwelveMonthPage({
       <PageHeader
         title="12-Month Transaction Summary"
         description={`Month by month through ${year}`}
+        actions={<ExportButtons slug="twelve-month" params={{ year: String(year) }} />}
       />
 
       {years.length > 1 && (
@@ -81,12 +71,9 @@ export default async function TwelveMonthPage({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {ROWS.map((row) => {
-              const values = summary[row.key] as Decimal[];
-              // A running balance has no meaningful total, only a year-end figure.
-              const total = row.key === "cashBalance"
-                ? values[11]
-                : values.reduce((s, v) => s.plus(v), new Decimal(0));
+            {TWELVE_MONTH_ROWS.map((row) => {
+              const values = summary[row.key];
+              const total = twelveMonthTotal(row.key, values);
               return (
                 <TableRow key={row.key} className={row.emphasis ? "bg-muted/40" : ""}>
                   <TableCell className={`sticky left-0 bg-inherit ${row.emphasis ? "font-semibold" : "font-medium"}`}>

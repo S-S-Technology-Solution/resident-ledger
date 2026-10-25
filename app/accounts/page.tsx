@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookOpen } from "lucide-react";
@@ -13,12 +12,10 @@ import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { accountWhere, acTypeLabel, ACCOUNT_TYPES } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
-
-function acTypeLabel(t: string) {
-  return t === "INCOME" || t === "EXPENSE" ? "P&L" : "Balance Sheet";
-}
 
 export default async function AccountsPage({
   searchParams,
@@ -28,27 +25,27 @@ export default async function AccountsPage({
   await requireScreen("accounts");
   const { type } = await searchParams;
   const accounts = await db.account.findMany({
-    where: {
-      associationId: DEFAULT_ASSOCIATION_ID,
-      ...(type ? { type: type as "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE" } : {}),
-    },
+    where: accountWhere(type),
     include: { parent: true },
     orderBy: { code: "asc" },
   });
-
-  const types = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"] as const;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Chart of Accounts"
         description={`${accounts.length} accounts`}
-        actions={<Writable><AccountDialog mode="create" /></Writable>}
+        actions={
+          <>
+            <ExportButtons slug="accounts" params={{ type }} />
+            <Writable><AccountDialog mode="create" /></Writable>
+          </>
+        }
       />
 
       <nav className="flex items-center gap-1 text-sm border-b">
         <Link href="/accounts" className={cn("px-3 py-2 -mb-px border-b-2", !type ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>All</Link>
-        {types.map((t) => (
+        {ACCOUNT_TYPES.map((t) => (
           <Link
             key={t}
             href={`/accounts?type=${t}`}

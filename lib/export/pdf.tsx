@@ -16,9 +16,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 4,
   },
-  th: { fontFamily: "Helvetica-Bold", fontSize: 9 },
+  th: { fontFamily: "Helvetica-Bold", fontSize: 9, paddingHorizontal: 3 },
   row: { flexDirection: "row", paddingVertical: 4, paddingHorizontal: 4, borderBottomWidth: 0.25, borderColor: "#e5e7eb" },
-  cell: { fontSize: 9 },
+  // Side padding keeps a right-aligned figure clear of the next column's text.
+  cell: { fontSize: 9, paddingHorizontal: 3 },
   totalsRow: {
     flexDirection: "row",
     paddingVertical: 6,
@@ -27,7 +28,13 @@ const styles = StyleSheet.create({
     borderColor: "#111827",
     marginTop: 2,
   },
-  totalsCell: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  totalsCell: { fontSize: 9, fontFamily: "Helvetica-Bold", paddingHorizontal: 3 },
+  headingRow: { backgroundColor: "#f3f4f6", borderBottomWidth: 0.5, borderColor: "#9ca3af", marginTop: 4 },
+  subtotalRow: { borderTopWidth: 0.75, borderColor: "#111827", borderBottomWidth: 0.25 },
+  bold: { fontFamily: "Helvetica-Bold" },
+  muted: { color: "#6b7280" },
+  signatures: { flexDirection: "row", gap: 24, marginTop: 48 },
+  signature: { flex: 1, borderTopWidth: 0.75, borderColor: "#6b7280", paddingTop: 4, fontSize: 8, color: "#374151" },
   footer: {
     position: "absolute",
     bottom: 18,
@@ -53,7 +60,7 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
 
   const doc = (
     <Document title={data.title} author="ResidentLedger">
-      <Page size="A4" style={styles.page} wrap>
+      <Page size="A4" orientation={data.landscape ? "landscape" : "portrait"} style={styles.page} wrap>
         <View style={styles.header}>
           <Text style={styles.brand}>{data.associationName}</Text>
           <Text style={styles.title}>{data.title}</Text>
@@ -79,7 +86,11 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
         </View>
 
         {data.rows.map((r, i) => (
-          <View style={styles.row} key={i} wrap={false}>
+          <View
+            style={[styles.row, r.__style === "heading" ? styles.headingRow : {}, r.__style === "total" ? styles.subtotalRow : {}]}
+            key={i}
+            wrap={false}
+          >
             {data.columns.map((c) => {
               const raw = r[c.key];
               const val = c.money ? formatMoney(raw) : raw == null ? "" : String(raw);
@@ -90,6 +101,8 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
                     styles.cell,
                     flex(c),
                     { textAlign: c.align ?? (c.money ? "right" : "left") },
+                    r.__style === "heading" || r.__style === "total" ? styles.bold : {},
+                    r.__style === "muted" ? styles.muted : {},
                   ]}
                 >
                   {val}
@@ -119,6 +132,12 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
             })}
           </View>
         )}
+
+        {data.signatures?.length ? (
+          <View style={styles.signatures} wrap={false}>
+            {data.signatures.map((s) => <Text key={s} style={styles.signature}>{s}</Text>)}
+          </View>
+        ) : null}
 
         <View style={styles.footer} fixed>
           <Text>{data.associationName}</Text>

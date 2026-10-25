@@ -8,6 +8,7 @@ import { requireScreen, currentUser } from "@/lib/screen-guard";
 import { canPost } from "@/lib/permissions";
 import { draftsRequired } from "@/lib/drafts";
 import { DraftList } from "./draft-list";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function DraftsPage() {
         description={on
           ? "Receipts and payments keyed in but not yet in the accounts. Check each entry and amount, then post."
           : "Checking before posting is switched off in Settings, so new receipts and payments post straight away. Drafts already here still need posting."}
+        actions={<ExportButtons slug="drafts" />}
       />
       <DataCard>
         {drafts.length === 0 ? (

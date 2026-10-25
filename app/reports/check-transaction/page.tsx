@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { Prisma } from "@prisma/client";
 import { format } from "date-fns";
 import { Search } from "lucide-react";
-import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
+import { findTransactions, hasTransactionFilter, type TransactionSearch } from "@/lib/report-queries";
 import { fmtRM } from "@/lib/money";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -12,11 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { ExportButtons } from "@/components/export-buttons";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
-
-type Search = { q?: string; amount?: string; from?: string; to?: string; status?: string };
 
 /**
  * Transaction enquiry — find a posting when you know roughly what you are looking
@@ -26,46 +23,21 @@ type Search = { q?: string; amount?: string; from?: string; to?: string; status?
 export default async function CheckTransactionPage({
   searchParams,
 }: {
-  searchParams: Promise<Search>;
+  searchParams: Promise<TransactionSearch>;
 }) {
   await requireScreen("reports");
-  const { q, amount, from, to, status } = await searchParams;
-  const hasFilter = Boolean(q || amount || from || to || status);
+  const search = await searchParams;
+  const { q, amount, from, to, status } = search;
+  const hasFilter = hasTransactionFilter(search);
 
-  const where: Prisma.JournalEntryWhereInput = { associationId: DEFAULT_ASSOCIATION_ID };
-  if (status) where.status = status as Prisma.EnumJournalStatusFilter["equals"];
-  if (from || to) {
-    where.date = { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) };
-  }
-  if (q) {
-    where.OR = [
-      { description: { contains: q, mode: "insensitive" } },
-      { reference: { contains: q, mode: "insensitive" } },
-      { entryNo: { contains: q, mode: "insensitive" } },
-    ];
-  }
-  if (amount) {
-    // Match either side, so you can search by a figure off a bank statement.
-    where.lines = { some: { OR: [{ debit: amount }, { credit: amount }] } };
-  }
-
-  const entries = hasFilter
-    ? await db.journalEntry.findMany({
-        where,
-        include: {
-          batch: { select: { batchNo: true } },
-          lines: { include: { account: { select: { code: true, name: true } } } },
-        },
-        orderBy: [{ date: "desc" }, { entryNo: "desc" }],
-        take: 200,
-      })
-    : [];
+  const entries = await findTransactions(search, 200);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Check Transaction"
         description="Find a posting by amount, reference, description or date"
+        actions={hasFilter && <ExportButtons slug="check-transaction" params={{ q, amount, from, to, status }} />}
       />
 
       <form className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 no-print">
@@ -135,33 +107,30 @@ export default async function CheckTransactionPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.map((e) => {
-                const total = e.lines.reduce((s, l) => s + Number(l.debit), 0);
-                return (
-                  <TableRow key={e.id} className={e.status === "VOIDED" ? "opacity-60" : ""}>
-                    <TableCell>{format(e.date, "dd MMM yyyy")}</TableCell>
-                    <TableCell className="font-mono">
-                      <Link href={`/journal/${e.id}`} className="hover:underline">{e.entryNo}</Link>
-                    </TableCell>
-                    <TableCell className="font-mono text-muted-foreground">
-                      {e.batch?.batchNo ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      {e.description}
-                      {e.reference && (
-                        <span className="text-muted-foreground"> · {e.reference}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {e.lines.map((l) => l.account.code).join(" / ")}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={e.status === "POSTED" ? "default" : "outline"}>{e.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono tabular">{fmtRM(total)}</TableCell>
-                  </TableRow>
-                );
-              })}
+              {entries.map((e) => (
+                <TableRow key={e.id} className={e.status === "VOIDED" ? "opacity-60" : ""}>
+                  <TableCell>{format(e.date, "dd MMM yyyy")}</TableCell>
+                  <TableCell className="font-mono">
+                    <Link href={`/journal/${e.id}`} className="hover:underline">{e.entryNo}</Link>
+                  </TableCell>
+                  <TableCell className="font-mono text-muted-foreground">
+                    {e.batch?.batchNo ?? "—"}
+                  </TableCell>
+                  <TableCell>
+                    {e.description}
+                    {e.reference && (
+                      <span className="text-muted-foreground"> · {e.reference}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {e.lines.map((l) => l.account.code).join(" / ")}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={e.status === "POSTED" ? "default" : "outline"}>{e.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular">{fmtRM(e.total)}</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
           {entries.length === 0 && (

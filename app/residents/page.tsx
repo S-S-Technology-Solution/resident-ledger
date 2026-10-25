@@ -12,6 +12,8 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { filterResidents } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +25,19 @@ export default async function ResidentsPage({
   await requireScreen("residents");
   const { q } = await searchParams;
   const all = await residentBalances();
-  const rows = q
-    ? all.filter((r) => r.unitAddress.toLowerCase().includes(q.toLowerCase()) || r.ownerName.toLowerCase().includes(q.toLowerCase()) || r.debtorCode?.toLowerCase().includes(q.toLowerCase()))
-    : all;
+  const rows = filterResidents(all, q);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Residents"
         description={`${rows.length} of ${all.length}`}
-        actions={<Writable><ResidentDialog mode="create" /></Writable>}
+        actions={
+          <>
+            <ExportButtons slug="residents" params={{ q }} />
+            <Writable><ResidentDialog mode="create" /></Writable>
+          </>
+        }
       />
 
       <form className="max-w-sm">

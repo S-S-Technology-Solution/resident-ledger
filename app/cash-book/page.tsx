@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { CASH_BOOK_ORDER } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,7 @@ export default async function CashBookPage({
   const [entries, total, sums] = await Promise.all([
     db.cashEntry.findMany({
       where,
-      orderBy: [{ date: "desc" }, { refNo: "desc" }],
+      orderBy: CASH_BOOK_ORDER,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: { account: { select: { code: true, name: true } }, _count: { select: { lines: true } } },
@@ -49,6 +51,7 @@ export default async function CashBookPage({
         description="Receipts and payments with no resident or supplier behind them"
         actions={
           <>
+            <ExportButtons slug="cash-book-list" />
             <Writable><Button asChild><Link href="/cash-book/new?direction=IN">New receipt</Link></Button></Writable>
             <Writable><Button asChild variant="outline"><Link href="/cash-book/new?direction=OUT">New payment voucher</Link></Button></Writable>
           </>

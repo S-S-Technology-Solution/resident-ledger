@@ -1,23 +1,16 @@
 import { format } from "date-fns";
 import { ShieldCheck } from "lucide-react";
 import { listAudit } from "@/lib/audit";
+import { auditDetail } from "@/lib/report-queries";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
+import { ExportButtons } from "@/components/export-buttons";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
-
-function summarise(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value !== "object") return String(value);
-  return Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== null && v !== undefined && v !== "")
-    .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
-    .join(" · ");
-}
 
 export default async function AuditTrailPage() {
   await requireScreen("reports");
@@ -28,6 +21,7 @@ export default async function AuditTrailPage() {
       <PageHeader
         title="Audit Trail"
         description="Voids, deletions, opening balances and year-end closings — who did what, and when"
+        actions={<ExportButtons slug="audit-trail" />}
       />
 
       <DataCard>
@@ -55,7 +49,7 @@ export default async function AuditTrailPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {summarise(e.before) || summarise(e.after) || "—"}
+                  {auditDetail(e)}
                 </TableCell>
               </TableRow>
             ))}

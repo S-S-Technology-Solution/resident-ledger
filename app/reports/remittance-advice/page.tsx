@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
-import { PrintButton } from "@/app/receipts/[id]/print-button";
+import { ExportButtons } from "@/components/export-buttons";
+import { remittancePayments } from "@/lib/report-queries";
 import { DateRange } from "../_components/date-range";
 import { requireScreen } from "@/lib/screen-guard";
 
@@ -22,8 +23,6 @@ export default async function RemittanceAdvicePage({
 }) {
   await requireScreen("reports");
   const { supplierId, from, to } = await searchParams;
-  const fromDate = from ? new Date(from) : undefined;
-  const toDate = to ? new Date(to) : undefined;
 
   const [suppliers, association] = await Promise.all([
     db.supplier.findMany({
@@ -38,20 +37,9 @@ export default async function RemittanceAdvicePage({
     ? await db.supplier.findUnique({ where: { id: supplierId } })
     : null;
 
-  const payments = supplier
-    ? await db.billPayment.findMany({
-        where: {
-          bill: { supplierId: supplier.id, associationId: DEFAULT_ASSOCIATION_ID }, method: { not: "DEBIT_NOTE" },
-          ...(fromDate || toDate
-            ? { date: { ...(fromDate && { gte: fromDate }), ...(toDate && { lte: toDate }) } }
-            : {}),
-        },
-        include: { bill: true },
-        orderBy: { date: "asc" },
-      })
-    : [];
-
-  const total = payments.reduce((s, p) => s + Number(p.amount), 0);
+  const { payments, total } = supplier
+    ? await remittancePayments(supplier.id, { from, to })
+    : { payments: [], total: 0 };
 
   return (
     <div className="space-y-6">
@@ -61,7 +49,9 @@ export default async function RemittanceAdvicePage({
         actions={
           <>
             <DateRange />
-            {supplier && payments.length > 0 && <PrintButton />}
+            {supplier && payments.length > 0 && (
+              <ExportButtons slug="remittance-advice" params={{ supplierId: supplier.id, from, to }} />
+            )}
           </>
         }
       />

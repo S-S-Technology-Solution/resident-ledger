@@ -6,12 +6,13 @@ import { Empty } from "@/components/empty";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { GROUP_LABEL } from "@/lib/batches";
 import { fmtRM } from "@/lib/money";
 import { GenerateBatchDialog, LockBatchButton, DeleteBatchButton } from "./generate-dialog";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { batchQuery } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -24,16 +25,7 @@ export default async function BatchesPage({
   const { year } = await searchParams;
   const filterYear = year ? Number(year) : undefined;
 
-  const batches = await db.batch.findMany({
-    where: { associationId: DEFAULT_ASSOCIATION_ID, ...(filterYear ? { year: filterYear } : {}) },
-    orderBy: [{ year: "desc" }, { month: "desc" }, { group: "asc" }],
-    include: {
-      entries: {
-        where: { status: { not: "DRAFT" as const } },
-        select: { id: true, lines: { select: { debit: true } } },
-      },
-    },
-  });
+  const batches = await db.batch.findMany(batchQuery(filterYear));
 
   const years = [...new Set(batches.map((b) => b.year))].sort((a, b) => b - a);
   const allYears = filterYear
@@ -45,7 +37,12 @@ export default async function BatchesPage({
       <PageHeader
         title="Batches"
         description="Transactions are filed into a monthly batch per group, the way the accountant works"
-        actions={<Writable><GenerateBatchDialog defaultYear={new Date().getFullYear()} /></Writable>}
+        actions={
+          <>
+            <ExportButtons slug="batches" params={{ year }} />
+            <Writable><GenerateBatchDialog defaultYear={new Date().getFullYear()} /></Writable>
+          </>
+        }
       />
 
       {allYears.length > 1 && (

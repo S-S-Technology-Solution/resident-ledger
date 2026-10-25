@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ScrollText } from "lucide-react";
 import { format } from "date-fns";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,13 +12,12 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
-import type { Prisma } from "@prisma/client";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { journalWhere, JOURNAL_ORDER, JOURNAL_STATUSES } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
-
-const STATUSES = ["DRAFT", "POSTED", "VOIDED"] as const;
 
 export default async function JournalPage({
   searchParams,
@@ -31,23 +29,12 @@ export default async function JournalPage({
   const { q, status, from, to } = sp;
   const page = pageFrom(sp.page);
 
-  const where = {
-    associationId: DEFAULT_ASSOCIATION_ID,
-    ...(status ? { status: status as "DRAFT" | "POSTED" | "VOIDED" } : {}),
-    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-    ...(q ? {
-      OR: [
-        { description: { contains: q, mode: "insensitive" } },
-        { reference: { contains: q, mode: "insensitive" } },
-        { entryNo: { contains: q, mode: "insensitive" } },
-      ],
-    } : {}),
-  } satisfies Prisma.JournalEntryWhereInput;
+  const where = journalWhere({ q, status, from, to });
   const [entries, total] = await Promise.all([
     db.journalEntry.findMany({
       where,
       include: { lines: true },
-      orderBy: [{ date: "desc" }, { entryNo: "desc" }],
+      orderBy: JOURNAL_ORDER,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -59,7 +46,12 @@ export default async function JournalPage({
       <PageHeader
         title="Journal Entries"
         description={`${total.toLocaleString()} ${total === 1 ? "entry" : "entries"}`}
-        actions={<Writable><Button asChild><Link href="/journal/new">New Entry</Link></Button></Writable>}
+        actions={
+          <>
+            <ExportButtons slug="journal" params={{ q, status, from, to }} />
+            <Writable><Button asChild><Link href="/journal/new">New Entry</Link></Button></Writable>
+          </>
+        }
       />
 
       <form className="flex flex-wrap items-end gap-3">
@@ -84,7 +76,7 @@ export default async function JournalPage({
 
       <nav className="flex items-center gap-1 text-sm border-b">
         <Link href={`/journal${qs({ q, from, to })}`} className={cn("px-3 py-2 -mb-px border-b-2", !status ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>All</Link>
-        {STATUSES.map((s) => (
+        {JOURNAL_STATUSES.map((s) => (
           <Link key={s} href={`/journal${qs({ q, from, to, status: s })}`}
             className={cn("px-3 py-2 -mb-px border-b-2 uppercase text-xs tracking-wide", status === s ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>{s}</Link>
         ))}

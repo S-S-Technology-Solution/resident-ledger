@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
+import { ExportButtons } from "@/components/export-buttons";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,12 @@ export default async function SubsidiaryLedgerPage({
       <PageHeader
         title={kind === "debtor" ? "Debtor Ledger" : "Creditor Ledger"}
         description={heading ?? "Every invoice and payment for one account, with a running balance"}
-        actions={<DateRange />}
+        actions={
+          <>
+            <DateRange />
+            {data && <ExportButtons slug="debtor-ledger" params={{ kind, id, from, to }} />}
+          </>
+        }
       />
 
       <div className="flex gap-1 border-b no-print">

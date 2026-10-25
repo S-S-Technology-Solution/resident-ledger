@@ -1,17 +1,14 @@
-import Decimal from "decimal.js";
 import { format } from "date-fns";
-import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
+import { cashFlow } from "@/lib/report-queries";
 import { fmtRM } from "@/lib/money";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { DateRange } from "../_components/date-range";
+import { ExportButtons } from "@/components/export-buttons";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
-
-const CASH_CODES = ["3300/0000", "3300/0010"];
 
 export default async function CashFlowPage({
   searchParams,
@@ -20,83 +17,7 @@ export default async function CashFlowPage({
 }) {
   await requireScreen("reports");
   const { from, to } = await searchParams;
-  const fromDate = from ? new Date(from) : undefined;
-  const toDate = to ? new Date(to) : new Date();
-
-  const cashAccounts = await db.account.findMany({
-    where: { associationId: DEFAULT_ASSOCIATION_ID, code: { in: CASH_CODES } },
-    select: { id: true, code: true, name: true },
-  });
-  const cashIds = cashAccounts.map((a) => a.id);
-
-  // Every entry that moves cash, paired with whatever sat on the other side.
-  const cashLines = await db.journalLine.findMany({
-    where: {
-      accountId: { in: cashIds },
-      entry: {
-        associationId: DEFAULT_ASSOCIATION_ID,
-        status: { not: "DRAFT" as const },
-        date: { ...(fromDate && { gte: fromDate }), lte: toDate },
-      },
-    },
-    include: {
-      entry: { include: { lines: { include: { account: true } } } },
-    },
-  });
-
-  // Opening cash: everything before the window.
-  const openingLines = fromDate
-    ? await db.journalLine.findMany({
-        where: {
-          accountId: { in: cashIds },
-          entry: { associationId: DEFAULT_ASSOCIATION_ID, status: { not: "DRAFT" as const }, date: { lt: fromDate } },
-        },
-        select: { debit: true, credit: true },
-      })
-    : [];
-
-  const opening = openingLines.reduce(
-    (s, l) => s.plus(new Decimal(l.debit.toString())).minus(new Decimal(l.credit.toString())),
-    new Decimal(0),
-  );
-
-  // Group the movement by the account on the other side of each cash line.
-  const buckets = new Map<string, { code: string; name: string; type: string; inflow: Decimal; outflow: Decimal }>();
-
-  for (const line of cashLines) {
-    const net = new Decimal(line.debit.toString()).minus(new Decimal(line.credit.toString()));
-    if (net.isZero()) continue;
-
-    const others = line.entry.lines.filter((l) => !cashIds.includes(l.accountId));
-    const otherTotal = others.reduce(
-      (s, l) => s.plus(new Decimal(l.debit.toString())).plus(new Decimal(l.credit.toString())),
-      new Decimal(0),
-    );
-    if (otherTotal.isZero()) continue;
-
-    for (const o of others) {
-      const share = new Decimal(o.debit.toString()).plus(new Decimal(o.credit.toString()));
-      if (share.isZero()) continue;
-      const portion = net.times(share).dividedBy(otherTotal);
-      const key = o.account.code;
-      const b = buckets.get(key) ?? {
-        code: o.account.code, name: o.account.name, type: o.account.type,
-        inflow: new Decimal(0), outflow: new Decimal(0),
-      };
-      if (portion.gt(0)) b.inflow = b.inflow.plus(portion);
-      else b.outflow = b.outflow.plus(portion.abs());
-      buckets.set(key, b);
-    }
-  }
-
-  const rows = [...buckets.values()].sort((a, b) => a.code.localeCompare(b.code));
-  const inflows = rows.filter((r) => r.inflow.gt(r.outflow));
-  const outflows = rows.filter((r) => r.outflow.gte(r.inflow));
-
-  const totalIn = rows.reduce((s, r) => s.plus(r.inflow), new Decimal(0));
-  const totalOut = rows.reduce((s, r) => s.plus(r.outflow), new Decimal(0));
-  const movement = totalIn.minus(totalOut);
-  const closing = opening.plus(movement);
+  const { cashAccounts, fromDate, toDate, opening, inflows, outflows, movement, closing } = await cashFlow({ from, to });
 
   const description = fromDate
     ? `${format(fromDate, "dd MMM yyyy")} to ${format(toDate, "dd MMM yyyy")}`
@@ -104,7 +25,16 @@ export default async function CashFlowPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Cash Flow Statement" description={description} actions={<DateRange />} />
+      <PageHeader
+        title="Cash Flow Statement"
+        description={description}
+        actions={
+          <>
+            <DateRange />
+            <ExportButtons slug="cash-flow" params={{ from, to }} />
+          </>
+        }
+      />
 
       <DataCard>
         <Table>

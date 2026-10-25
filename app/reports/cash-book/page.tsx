@@ -1,18 +1,15 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import Decimal from "decimal.js";
-import { db } from "@/lib/db";
-import { controlAccount } from "@/lib/control-accounts";
+import { cashBook } from "@/lib/report-queries";
 import { fmtRM } from "@/lib/money";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { DateRange } from "../_components/date-range";
+import { ExportButtons } from "@/components/export-buttons";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
-
-type AccountKey = "BANK" | "CASH";
 
 export default async function CashBookPage({
   searchParams,
@@ -21,99 +18,8 @@ export default async function CashBookPage({
 }) {
   await requireScreen("reports");
   const { from, to, account } = await searchParams;
-  const accountKey: AccountKey = account === "CASH" ? "CASH" : "BANK";
-  const acc = await controlAccount(accountKey);
-
-  const now = new Date();
-  const fromDate = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth(), 1);
-  const toDate = to ? new Date(to) : now;
-  toDate.setHours(23, 59, 59, 999);
-
-  const [linesBefore, linesInRange] = await Promise.all([
-    db.journalLine.findMany({
-      where: { accountId: acc.id, entry: { date: { lt: fromDate }, status: { not: "DRAFT" as const } } },
-      select: { debit: true, credit: true },
-    }),
-    db.journalLine.findMany({
-      where: { accountId: acc.id, entry: { date: { gte: fromDate, lte: toDate }, status: { not: "DRAFT" as const } } },
-      include: { entry: true },
-    }),
-  ]);
-
-  const opening = linesBefore.reduce(
-    (s, l) => s.plus(new Decimal(l.debit.toString())).minus(new Decimal(l.credit.toString())),
-    new Decimal(0),
-  );
-
-  // For each line, resolve payee/counterparty by looking up the source row.
-  // Supplier payment vouchers are found by their journal entry (one voucher may pay several bills).
-  const billPaymentEntryIds = linesInRange
-    .filter((l) => l.entry.source === "billpayment")
-    .map((l) => l.entryId);
-  const receiptIds = linesInRange
-    .filter((l) => l.entry.source === "receipt" && l.entry.sourceId)
-    .map((l) => l.entry.sourceId as string);
-
-  const [billPayments, receipts] = await Promise.all([
-    billPaymentEntryIds.length
-      ? db.billPayment.findMany({
-          where: { entryId: { in: billPaymentEntryIds } },
-          include: { bill: { include: { supplier: true } } },
-        })
-      : Promise.resolve([]),
-    receiptIds.length
-      ? db.receipt.findMany({
-          where: { id: { in: receiptIds } },
-          include: { resident: true },
-        })
-      : Promise.resolve([]),
-  ]);
-  const bpMap = new Map(billPayments.map((p) => [p.entryId, p]));
-  const rcMap = new Map(receipts.map((r) => [r.id, r]));
-
-  const sorted = [...linesInRange].sort(
-    (a, b) =>
-      a.entry.date.getTime() - b.entry.date.getTime() ||
-      a.entry.entryNo.localeCompare(b.entry.entryNo),
-  );
-
-  let running = opening;
-  const rows = sorted.map((l) => {
-    const debit = new Decimal(l.debit.toString());
-    const credit = new Decimal(l.credit.toString());
-    running = running.plus(debit).minus(credit);
-    let payee = "—";
-    let voucher = l.entry.entryNo;
-    if (l.entry.source === "billpayment") {
-      const bp = bpMap.get(l.entryId);
-      if (bp) {
-        payee = bp.bill.supplier.name;
-        voucher = bp.voucherNo || bp.bankRef || bp.bill.invoiceNo || l.entry.entryNo;
-      }
-    } else if (l.entry.source === "receipt" && l.entry.sourceId) {
-      const r = rcMap.get(l.entry.sourceId);
-      if (r) {
-        payee = `${r.resident.unitAddress} — ${r.resident.ownerName}`;
-        voucher = r.receiptNo;
-      }
-    }
-    return {
-      key: l.id,
-      date: l.entry.date,
-      voucher,
-      payee,
-      description: l.entry.description,
-      debit,
-      credit,
-      balance: running,
-    };
-  });
-
-  const totalIn = rows.reduce((s, r) => s.plus(r.debit), new Decimal(0));
-  const totalOut = rows.reduce((s, r) => s.plus(r.credit), new Decimal(0));
-  const closing = running;
-
-  const accountLabel = accountKey === "BANK" ? "Bank (3300/0000)" : "Cash (3300/0010)";
+  const { accountKey, accountLabel, fromDate, toDate, opening, rows, totalIn, totalOut, closing } =
+    await cashBook({ from, to, account });
 
   return (
     <div className="space-y-6">
@@ -137,6 +43,7 @@ export default async function CashBookPage({
               </Link>
             </div>
             <DateRange mode="range" />
+            <ExportButtons slug="cash-book" params={{ account: accountKey, from, to }} />
           </div>
         }
       />

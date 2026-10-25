@@ -10,6 +10,7 @@ import { Empty } from "@/components/empty";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UploadForm } from "./upload-form";
+import { ExportButtons } from "@/components/export-buttons";
 import { BfItems } from "./bf-items";
 import { listBfItems } from "@/lib/bank-statement/service";
 import { getCurrentUser, canPost } from "@/lib/permissions";
@@ -42,6 +43,7 @@ export default async function BankStatementsPage() {
       <PageHeader
         title="Bank Statements"
         description="Upload each month's RHB statement, pair its lines with the books, and sign off the reconciliation."
+        actions={<ExportButtons slug="bank-statements" />}
       />
 
       <UploadForm />

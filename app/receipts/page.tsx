@@ -2,7 +2,6 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Receipt as ReceiptIcon } from "lucide-react";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +11,10 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
-import type { Prisma } from "@prisma/client";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { receiptWhere, RECEIPT_ORDER } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -27,23 +27,11 @@ export default async function ReceiptsPage({
   const sp = await searchParams;
   const { q, from, to } = sp;
   const page = pageFrom(sp.page);
-  const where = {
-    associationId: DEFAULT_ASSOCIATION_ID,
-    method: { not: "CREDIT_NOTE" },
-    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-    ...(q ? {
-      OR: [
-        { receiptNo: { contains: q, mode: "insensitive" } },
-        { bankRef: { contains: q, mode: "insensitive" } },
-        { resident: { unitAddress: { contains: q, mode: "insensitive" } } },
-        { resident: { ownerName: { contains: q, mode: "insensitive" } } },
-      ],
-    } : {}),
-  } satisfies Prisma.ReceiptWhereInput;
+  const where = receiptWhere({ q, from, to });
   const [receipts, total] = await Promise.all([
     db.receipt.findMany({
       where,
-      orderBy: [{ date: "desc" }, { receiptNo: "desc" }],
+      orderBy: RECEIPT_ORDER,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: { resident: true },
@@ -58,7 +46,12 @@ export default async function ReceiptsPage({
       <PageHeader
         title="Receipts"
         description={`${total.toLocaleString()} ${filterActive ? (total === 1 ? "match" : "matches") : "receipts, newest first"}`}
-        actions={<Writable><Button asChild><Link href="/receipts/new">New Receipt</Link></Button></Writable>}
+        actions={
+          <>
+            <ExportButtons slug="receipts" params={{ q, from, to }} />
+            <Writable><Button asChild><Link href="/receipts/new">New Receipt</Link></Button></Writable>
+          </>
+        }
       />
 
       <form className="flex flex-wrap items-end gap-3">

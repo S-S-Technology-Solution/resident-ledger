@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineActions, type LineView } from "./line-actions";
 import { StatementActions } from "./statement-actions";
+import { ExportButtons } from "@/components/export-buttons";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
@@ -113,8 +114,18 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
         }
       />
 
-      <ReconciliationStatement rec={rec} />
+      <div className="space-y-2">
+        <div className="flex max-w-3xl items-center justify-between gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground">Reconciliation statement</h2>
+          <ExportButtons slug="bank-reconciliation" params={{ statementId: statement.id }} />
+        </div>
+        <ReconciliationStatement rec={rec} />
+      </div>
 
+      <div className="flex items-center justify-between gap-2 no-print">
+        <h2 className="text-sm font-medium text-muted-foreground">Statement lines</h2>
+        <ExportButtons slug="bank-statement-lines" params={{ statementId: statement.id }} />
+      </div>
       <DataCard>
         <Table>
           <TableHeader>

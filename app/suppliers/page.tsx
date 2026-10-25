@@ -10,6 +10,7 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,12 @@ export default async function SuppliersPage() {
       <PageHeader
         title="Suppliers"
         description={`${rows.length} ${rows.length === 1 ? "supplier" : "suppliers"}`}
-        actions={<Writable><SupplierDialog mode="create" /></Writable>}
+        actions={
+          <>
+            <ExportButtons slug="suppliers" />
+            <Writable><SupplierDialog mode="create" /></Writable>
+          </>
+        }
       />
       <DataCard>
         <Table>

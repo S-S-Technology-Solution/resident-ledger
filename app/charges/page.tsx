@@ -2,7 +2,6 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { CreditCard } from "lucide-react";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,9 +13,10 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
-import type { Prisma } from "@prisma/client";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { chargeWhere, CHARGE_ORDER } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -29,21 +29,11 @@ export default async function ChargesPage({
   const sp = await searchParams;
   const { q, from, to } = sp;
   const page = pageFrom(sp.page);
-  const where = {
-    associationId: DEFAULT_ASSOCIATION_ID,
-    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-    ...(q ? {
-      OR: [
-        { description: { contains: q, mode: "insensitive" } },
-        { resident: { unitAddress: { contains: q, mode: "insensitive" } } },
-        { resident: { ownerName: { contains: q, mode: "insensitive" } } },
-      ],
-    } : {}),
-  } satisfies Prisma.ChargeWhereInput;
+  const where = chargeWhere({ q, from, to });
   const [charges, total] = await Promise.all([
     db.charge.findMany({
       where,
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      orderBy: CHARGE_ORDER,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: { resident: true },
@@ -60,6 +50,7 @@ export default async function ChargesPage({
         description={`${total.toLocaleString()} ${filterActive ? (total === 1 ? "match" : "matches") : "charges, newest first"}`}
         actions={
           <>
+            <ExportButtons slug="charges" params={{ q, from, to }} />
             <Writable><BulkGenerateButton /></Writable>
             <Writable><Button asChild><Link href="/charges/new">New Charge</Link></Button></Writable>
           </>

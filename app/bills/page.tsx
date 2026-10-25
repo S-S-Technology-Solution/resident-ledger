@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { FileText } from "lucide-react";
 import Decimal from "decimal.js";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,13 +13,12 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { cn } from "@/lib/utils";
 import { Pager, PAGE_SIZE, pageFrom } from "@/components/pager";
-import type { Prisma } from "@prisma/client";
 import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
+import { billWhere, BILL_ORDER, BILL_STATUSES } from "@/lib/list-filters";
+import { ExportButtons } from "@/components/export-buttons";
 
 export const dynamic = "force-dynamic";
-
-const STATUSES = ["UNPAID", "PARTIAL", "PAID", "VOIDED"] as const;
 
 function qs(p: Record<string, string | undefined>): string {
   const sp = new URLSearchParams();
@@ -38,21 +36,11 @@ export default async function BillsPage({
   const sp = await searchParams;
   const { status, q, from, to } = sp;
   const page = pageFrom(sp.page);
-  const where = {
-    associationId: DEFAULT_ASSOCIATION_ID,
-    ...(status ? { status: status as "UNPAID" | "PARTIAL" | "PAID" | "VOIDED" } : {}),
-    ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
-    ...(q ? {
-      OR: [
-        { invoiceNo: { contains: q, mode: "insensitive" } },
-        { supplier: { name: { contains: q, mode: "insensitive" } } },
-      ],
-    } : {}),
-  } satisfies Prisma.BillWhereInput;
+  const where = billWhere({ status, q, from, to });
   const [bills, total] = await Promise.all([
     db.bill.findMany({
       where,
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      orderBy: BILL_ORDER,
       include: { supplier: true },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -67,7 +55,7 @@ export default async function BillsPage({
       <PageHeader
         title="Bills"
         description={`${total.toLocaleString()} ${status ? `· ${status.toLowerCase()}` : ""}${filterActive ? " · filtered" : ""}`}
-        actions={<Writable><div className="flex gap-2"><Button asChild variant="outline"><Link href="/bills/pay">Pay supplier</Link></Button><Button asChild><Link href="/bills/new">New Bill</Link></Button></div></Writable>}
+        actions={<><ExportButtons slug="bills" params={{ status, q, from, to }} /><Writable><div className="flex gap-2"><Button asChild variant="outline"><Link href="/bills/pay">Pay supplier</Link></Button><Button asChild><Link href="/bills/new">New Bill</Link></Button></div></Writable></>}
       />
 
       <form className="flex flex-wrap items-end gap-3">
@@ -92,7 +80,7 @@ export default async function BillsPage({
 
       <nav className="flex items-center gap-1 text-sm border-b">
         <Link href={`/bills${qs({ q, from, to })}`} className={cn("px-3 py-2 -mb-px border-b-2", !status ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>All</Link>
-        {STATUSES.map((f) => (
+        {BILL_STATUSES.map((f) => (
           <Link key={f} href={`/bills${qs({ q, from, to, status: f })}`}
             className={cn("px-3 py-2 -mb-px border-b-2 uppercase text-xs tracking-wide", status === f ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>{f}</Link>
         ))}

@@ -1,73 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildXlsx } from "@/lib/export/excel";
 import { buildPdf } from "@/lib/export/pdf";
-import {
-  trialBalance,
-  profitLoss,
-  balanceSheet,
-  generalLedgerReport,
-  arAgeing,
-  collectionReport,
-  apAgeing,
-  expenseByCategory,
-  expenseBySupplier,
-  paymentHistory,
-  fixedAssets,
-  invoiceListing,
-  billListing,
-  salesReport,
-  creditorPayments,
-  accountRange,
-  batchTransactions,
-} from "@/lib/export/reports";
-import type { ReportData } from "@/lib/export/types";
+import { EXPORTS } from "@/lib/export/registry";
 import { getCurrentUser } from "@/lib/permissions";
 import { canSeeScreen } from "@/lib/screens";
 
 export const dynamic = "force-dynamic";
 
-async function buildReport(slug: string, sp: URLSearchParams): Promise<ReportData> {
-  const range = { from: sp.get("from") ?? undefined, to: sp.get("to") ?? undefined };
-  switch (slug) {
-    case "trial-balance": return trialBalance({ ...range, view: sp.get("view") ?? undefined });
-    case "profit-loss": return profitLoss(range);
-    case "balance-sheet": return balanceSheet(range);
-    case "general-ledger": return generalLedgerReport(sp.get("accountId") ?? undefined, range);
-    case "ar-ageing": return arAgeing(range);
-    case "collection": return collectionReport(range);
-    case "ap-ageing": return apAgeing(range);
-    case "expense-by-category": return expenseByCategory(range);
-    case "expense-by-supplier": return expenseBySupplier(range);
-    case "payment-history": {
-      const residentId = sp.get("residentId");
-      if (!residentId) throw new Error("residentId is required for payment-history");
-      return paymentHistory(residentId, range);
-    }
-    case "fixed-assets": return fixedAssets(range);
-    case "invoice-listing": return invoiceListing({ ...range, view: sp.get("view") ?? undefined });
-    case "bill-listing": return billListing({ ...range, view: sp.get("view") ?? undefined });
-    case "sales-report": return salesReport(range);
-    case "creditor-payments": return creditorPayments(range);
-    case "account-range": return accountRange({
-      ...range,
-      fromCode: sp.get("fromCode") ?? undefined,
-      toCode: sp.get("toCode") ?? undefined,
-    });
-    case "batch-transactions": return batchTransactions({ batch: sp.get("batch") ?? undefined });
-    default: throw new Error(`Unknown report ${slug}`);
-  }
-}
-
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const user = await getCurrentUser();
-  if (!user || !user.active || !canSeeScreen(user, "reports")) {
-    return NextResponse.json({ error: "You don't have access to reports." }, { status: 403 });
-  }
   const { slug } = await params;
+  const def = EXPORTS[slug];
+  if (!def) return NextResponse.json({ error: `Unknown export ${slug}` }, { status: 404 });
+  // Each export belongs to a screen; you can download it if you can open that screen.
+  const user = await getCurrentUser();
+  if (!user || !user.active || !canSeeScreen(user, def.screen)) {
+    return NextResponse.json({ error: "You don't have access to this screen." }, { status: 403 });
+  }
   const sp = req.nextUrl.searchParams;
   const format = (sp.get("format") ?? "pdf").toLowerCase();
   try {
-    const data = await buildReport(slug, sp);
+    const data = await def.build(sp);
     const filename = `${slug}-${new Date().toISOString().slice(0, 10)}.${format === "xlsx" ? "xlsx" : "pdf"}`;
 
     if (format === "xlsx") {

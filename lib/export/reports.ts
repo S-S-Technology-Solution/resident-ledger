@@ -1,33 +1,11 @@
 import Decimal from "decimal.js";
 import { db } from "../db";
-import { DEFAULT_ASSOCIATION_ID, getAssociation } from "../association";
+import { DEFAULT_ASSOCIATION_ID } from "../association";
 import { accountBalances, generalLedgerAll, trialBalanceRows } from "../reports";
 import { ageingBucket } from "../ar";
 import type { ReportData, Column } from "./types";
 
-type Range = { from?: string; to?: string };
-
-function parseRange(r: Range) {
-  return {
-    from: r.from ? new Date(r.from) : undefined,
-    to: r.to ? new Date(r.to) : undefined,
-  };
-}
-
-function rangeSubtitle(r: Range, asOf = false) {
-  if (asOf) return `As of ${r.to ?? new Date().toISOString().slice(0, 10)}`;
-  if (r.from && r.to) return `${r.from} to ${r.to}`;
-  if (r.from) return `From ${r.from}`;
-  if (r.to) return `Through ${r.to}`;
-  return "All dates";
-}
-
-async function base(): Promise<Pick<ReportData, "associationName" | "generatedAt">> {
-  const a = await getAssociation();
-  return { associationName: a.name, generatedAt: new Date() };
-}
-
-const numCol = (key: string, header: string, width = 1): Column => ({ key, header, money: true, align: "right", width });
+import { base, numCol, parseRange, rangeSubtitle, type Range } from "./helpers";
 
 /** Year-to-date trial balance as at r.to, or b/f · movement · closing for r.from–r.to (view "movement"). */
 export async function trialBalance(r: Range & { view?: string }): Promise<ReportData> {

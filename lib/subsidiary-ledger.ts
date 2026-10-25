@@ -214,3 +214,24 @@ export async function twelveMonthSummary(year: number, associationId = DEFAULT_A
 
   return { year, sales, purchases, receipt, payment, expenses, cashBalance };
 }
+
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** The 12-month summary's lines, top to bottom; the cash balance is the emphasised one. */
+export const TWELVE_MONTH_ROWS: {
+  key: "sales" | "purchases" | "receipt" | "payment" | "expenses" | "cashBalance";
+  label: string;
+  emphasis?: boolean;
+}[] = [
+  { key: "sales", label: "Sales" },
+  { key: "purchases", label: "Purchases" },
+  { key: "receipt", label: "Receipts" },
+  { key: "payment", label: "Payments" },
+  { key: "expenses", label: "Expenses" },
+  { key: "cashBalance", label: "Cash & bank balance", emphasis: true },
+];
+
+/** A line's year figure. A running balance has no meaningful total, only a year-end figure. */
+export function twelveMonthTotal(key: (typeof TWELVE_MONTH_ROWS)[number]["key"], values: Decimal[]) {
+  return key === "cashBalance" ? values[11] : values.reduce((s, v) => s.plus(v), new Decimal(0));
+}

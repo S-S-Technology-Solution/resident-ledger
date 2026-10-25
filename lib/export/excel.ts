@@ -41,8 +41,19 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     cell.border = { bottom: { style: "thin", color: { argb: "FF888888" } } };
   });
 
-  // Data rows
-  for (const r of data.rows) ws.addRow(r);
+  // Data rows; `__style` is not a column, only how the row looks.
+  for (const { __style, ...r } of data.rows) {
+    const row = ws.addRow(r);
+    if (__style === "heading") {
+      row.font = { bold: true };
+      row.eachCell({ includeEmpty: true }, (cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } }; });
+    } else if (__style === "total") {
+      row.font = { bold: true };
+      row.eachCell((cell) => { cell.border = { top: { style: "thin", color: { argb: "FF000000" } } }; });
+    } else if (__style === "muted") {
+      row.font = { color: { argb: "FF6B7280" } };
+    }
+  }
 
   // Totals
   if (data.totals) {
@@ -52,6 +63,12 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
       cell.border = { top: { style: "thin", color: { argb: "FF000000" } } };
     });
   }
+
+  if (data.signatures?.length) {
+    ws.addRow([]); ws.addRow([]);
+    ws.addRow(data.signatures.map((s) => `${s}: ____________________`));
+  }
+  if (data.landscape) ws.pageSetup.orientation = "landscape";
 
   const ab = await wb.xlsx.writeBuffer();
   return Buffer.from(ab);
