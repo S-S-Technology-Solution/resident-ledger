@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { db } from "../db";
-import { DEFAULT_ASSOCIATION_ID } from "../association";
-import { accountBalances, generalLedgerAll, trialBalanceRows } from "../reports";
+import { DEFAULT_ASSOCIATION_ID, getAssociation } from "../association";
+import { accountBalances, generalLedgerAll, plPeriodLabel, profitAndLoss, trialBalanceRows, type PLLine } from "../reports";
 import { ageingBucket } from "../ar";
 import type { ReportData } from "./types";
 
@@ -51,34 +51,36 @@ export async function trialBalance(r: Range & { view?: string }): Promise<Report
   };
 }
 
+/** Revenue, less expenditure, net surplus/(deficit), with each line as a % of revenue — the Million layout. */
 export async function profitLoss(r: Range): Promise<ReportData> {
-  const range = parseRange(r);
-  const accs = await accountBalances(range);
-  const income = accs.filter((a) => a.type === "INCOME" && !a.balance.eq(0));
-  const expense = accs.filter((a) => a.type === "EXPENSE" && !a.balance.eq(0));
-  const totalIncome = income.reduce((s, a) => s.plus(a.balance), new Decimal(0));
-  const totalExpense = expense.reduce((s, a) => s.plus(a.balance), new Decimal(0));
-  const net = totalIncome.minus(totalExpense);
+  const association = await getAssociation();
+  const to = r.to ?? new Date().toISOString().slice(0, 10);
+  const fyStart = `${to.slice(0, 4)}-${String(association.fiscalYearStart).padStart(2, "0")}-01`;
+  const from = r.from ?? (fyStart <= to ? fyStart : `${Number(to.slice(0, 4)) - 1}${fyStart.slice(4)}`);
+  const pl = await profitAndLoss({ from: new Date(from), to: new Date(to) });
+  const period = plPeriodLabel(from, to, association.fiscalYearStart);
+  const pct = (v: Decimal | null) => (v === null ? "" : `${v.toFixed(2)}%`);
 
   const rows: ReportData["rows"] = [];
-  rows.push({ section: "Income", account: "", amount: "" });
-  for (const a of income) rows.push({ section: "", account: `  ${a.code} — ${a.name}`, amount: a.balance.toNumber() });
-  rows.push({ section: "Total Income", account: "", amount: totalIncome.toNumber() });
-  rows.push({ section: "Expense", account: "", amount: "" });
-  for (const a of expense) rows.push({ section: "", account: `  ${a.code} — ${a.name}`, amount: a.balance.toNumber() });
-  rows.push({ section: "Total Expense", account: "", amount: totalExpense.toNumber() });
+  const section = (title: string, lines: PLLine[], total: Decimal) => {
+    rows.push({ account: title, amount: "", pct: "", __style: "heading" });
+    for (const l of lines) rows.push({ account: l.name, amount: l.amount.toNumber(), pct: pct(l.pct), __style: "item" });
+    rows.push({ account: "", amount: total.toNumber(), pct: pct(pl.pct(total)), __style: "total" });
+  };
+  section("Revenue", pl.revenue, pl.totalRevenue);
+  section("Less : Expenditure", pl.expenditure, pl.totalExpenditure);
 
   return {
     ...(await base()),
-    title: "Profit and Loss",
-    subtitle: rangeSubtitle(r),
+    title: "Profit & Loss Account",
+    subtitle: `${period.heading} ${period.dates}`,
     columns: [
-      { key: "section", header: "Section", width: 2 },
-      { key: "account", header: "Account", width: 4 },
-      numCol("amount", "Amount", 2),
+      { key: "account", header: "", width: 5 },
+      numCol("amount", "RM", 1.6),
+      { key: "pct", header: "%", align: "right", width: 1 },
     ],
     rows,
-    totals: { section: "Net Income", account: "", amount: net.toNumber() },
+    totals: { account: "Net Surplus/(Deficit)", amount: pl.net.toNumber(), pct: pct(pl.pct(pl.net)) },
   };
 }
 

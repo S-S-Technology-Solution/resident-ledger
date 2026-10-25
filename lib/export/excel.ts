@@ -102,6 +102,8 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
       row.eachCell((cell) => { cell.border = { top: { style: "thin", color: { argb: "FF000000" } } }; });
     } else if (__style === "muted") {
       row.font = { color: { argb: "FF6B7280" } };
+    } else if (__style === "item") {
+      row.getCell(1).alignment = { indent: 2 };
     }
   }
 

@@ -188,3 +188,38 @@ export async function generalLedgerAll(range: Range & { accountId?: string } = {
     })
     .filter((s) => !s.opening.eq(0) || s.rows.length > 0);
 }
+
+export type PLLine = { id: string; code: string; name: string; amount: Decimal; pct: Decimal | null };
+export type ProfitAndLoss = {
+  revenue: PLLine[]; expenditure: PLLine[];
+  totalRevenue: Decimal; totalExpenditure: Decimal; net: Decimal;
+  pct: (v: Decimal) => Decimal | null;
+};
+
+/**
+ * The profit & loss account for a period, laid out as the old Million report:
+ * revenue, less expenditure, net surplus or deficit, each figure also shown as
+ * a percentage of total revenue.
+ */
+export async function profitAndLoss(range: Range): Promise<ProfitAndLoss> {
+  const all = await accountBalances(range);
+  const totalOf = (xs: AccountBalance[]) => xs.reduce((s, a) => s.plus(a.balance), new Decimal(0));
+  const income = all.filter((a) => a.type === "INCOME" && !a.balance.eq(0));
+  const expense = all.filter((a) => a.type === "EXPENSE" && !a.balance.eq(0));
+  const totalRevenue = totalOf(income);
+  const pct = (v: Decimal) => (totalRevenue.eq(0) ? null : v.div(totalRevenue).times(100));
+  const line = (a: AccountBalance): PLLine => ({ id: a.id, code: a.code, name: a.name, amount: a.balance, pct: pct(a.balance) });
+  const totalExpenditure = totalOf(expense);
+  return {
+    revenue: income.map(line), expenditure: expense.map(line),
+    totalRevenue, totalExpenditure, net: totalRevenue.minus(totalExpenditure), pct,
+  };
+}
+
+/** "Year-To-Date 31/12/2025" when the period starts with the financial year, else "01/03/2026 – 31/03/2026". */
+export function plPeriodLabel(from: string, to: string, fiscalYearStart: number) {
+  const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+  const fyStart = `${to.slice(0, 4)}-${String(fiscalYearStart).padStart(2, "0")}-01`;
+  const start = fyStart <= to ? fyStart : `${Number(to.slice(0, 4)) - 1}${fyStart.slice(4)}`;
+  return from === start ? { heading: "Year-To-Date", dates: dmy(to) } : { heading: "Period", dates: `${dmy(from)} – ${dmy(to)}` };
+}

@@ -187,6 +187,7 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
                     { textAlign: c.align ?? (c.money ? "right" : "left") },
                     r.__style === "heading" || r.__style === "total" ? styles.bold : {},
                     r.__style === "muted" ? styles.muted : {},
+                    r.__style === "item" && c === data.columns[0] ? { paddingLeft: 14 } : {},
                   ]}
                 >
                   {val}
