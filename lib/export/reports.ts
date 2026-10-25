@@ -3,7 +3,7 @@ import { db } from "../db";
 import { DEFAULT_ASSOCIATION_ID } from "../association";
 import { accountBalances, generalLedgerAll, trialBalanceRows } from "../reports";
 import { ageingBucket } from "../ar";
-import type { ReportData, Column } from "./types";
+import type { ReportData } from "./types";
 
 import { base, numCol, parseRange, rangeSubtitle, type Range } from "./helpers";
 
