@@ -31,7 +31,7 @@ export function DateRange({ mode = "range" }: { mode?: "range" | "asOf" }) {
         </div>
       )}
       <div className="space-y-1">
-        <Label>{mode === "asOf" ? "As of" : "To"}</Label>
+        <Label>{mode === "asOf" ? "As at" : "To"}</Label>
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <Button onClick={apply}>Apply</Button>

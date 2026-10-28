@@ -49,7 +49,7 @@ export default async function PLPage({
   const sp = await searchParams;
   const association = await getAssociation();
   const to = sp.to || new Date().toISOString().slice(0, 10);
-  // Default: year to date, from the start of the financial year.
+  // "As at" a date: year to date, from the start of the financial year.
   const fyStart = `${to.slice(0, 4)}-${String(association.fiscalYearStart).padStart(2, "0")}-01`;
   const from = sp.from || (fyStart <= to ? fyStart : `${Number(to.slice(0, 4)) - 1}${fyStart.slice(4)}`);
   const pl = await profitAndLoss({ from: new Date(from), to: new Date(to) });
@@ -62,7 +62,7 @@ export default async function PLPage({
         description="Revenue less expenditure, each line also as a percentage of revenue"
         actions={
           <>
-            <DateRange />
+            <DateRange mode="asOf" />
             <ExportButtons slug="profit-loss" params={{ from, to }} />
           </>
         }

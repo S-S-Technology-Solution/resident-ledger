@@ -216,10 +216,10 @@ export async function profitAndLoss(range: Range): Promise<ProfitAndLoss> {
   };
 }
 
-/** "Year-To-Date 31/12/2025" when the period starts with the financial year, else "01/03/2026 – 31/03/2026". */
+/** "As at 31/12/2025" when the period starts with the financial year, else "01/03/2026 – 31/03/2026". */
 export function plPeriodLabel(from: string, to: string, fiscalYearStart: number) {
   const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
   const fyStart = `${to.slice(0, 4)}-${String(fiscalYearStart).padStart(2, "0")}-01`;
   const start = fyStart <= to ? fyStart : `${Number(to.slice(0, 4)) - 1}${fyStart.slice(4)}`;
-  return from === start ? { heading: "Year-To-Date", dates: dmy(to) } : { heading: "Period", dates: `${dmy(from)} – ${dmy(to)}` };
+  return from === start ? { heading: "As at", dates: dmy(to) } : { heading: "Period", dates: `${dmy(from)} – ${dmy(to)}` };
 }
