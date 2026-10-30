@@ -1,7 +1,8 @@
 import Decimal from "decimal.js";
 import { db } from "../db";
-import { DEFAULT_ASSOCIATION_ID, getAssociation } from "../association";
-import { accountBalances, generalLedgerAll, plPeriodLabel, profitAndLoss, trialBalanceRows, type PLLine } from "../reports";
+import { DEFAULT_ASSOCIATION_ID } from "../association";
+import { generalLedgerAll, trialBalanceRows } from "../reports";
+import { financialPosition, incomeStatement, type FinancialStatement } from "../financial-statements";
 import { ageingBucket } from "../ar";
 import type { ReportData } from "./types";
 
@@ -51,78 +52,24 @@ export async function trialBalance(r: Range & { view?: string }): Promise<Report
   };
 }
 
-/** Revenue, less expenditure, net surplus/(deficit), with each line as a % of revenue — the Million layout. */
-export async function profitLoss(r: Range): Promise<ReportData> {
-  const association = await getAssociation();
-  const to = r.to ?? new Date().toISOString().slice(0, 10);
-  const fyStart = `${to.slice(0, 4)}-${String(association.fiscalYearStart).padStart(2, "0")}-01`;
-  const from = r.from ?? (fyStart <= to ? fyStart : `${Number(to.slice(0, 4)) - 1}${fyStart.slice(4)}`);
-  const pl = await profitAndLoss({ from: new Date(from), to: new Date(to) });
-  const period = plPeriodLabel(from, to, association.fiscalYearStart);
-  const pct = (v: Decimal | null) => (v === null ? "" : `${v.toFixed(2)}%`);
-
-  const rows: ReportData["rows"] = [];
-  const section = (title: string, lines: PLLine[], total: Decimal) => {
-    rows.push({ account: title, amount: "", pct: "", __style: "heading" });
-    for (const l of lines) rows.push({ account: l.name, amount: l.amount.toNumber(), pct: pct(l.pct), __style: "item" });
-    rows.push({ account: "", amount: total.toNumber(), pct: pct(pl.pct(total)), __style: "total" });
-  };
-  section("Revenue", pl.revenue, pl.totalRevenue);
-  section("Less : Expenditure", pl.expenditure, pl.totalExpenditure);
-
+/** A financial statement as the accountant lays it out; the PDF and Excel files draw it from `financial`. */
+function statementExport(fs: FinancialStatement, title: string): ReportData {
   return {
-    ...(await base()),
-    title: "Profit & Loss Account",
-    subtitle: `${period.heading} ${period.dates}`,
-    columns: [
-      { key: "account", header: "", width: 5 },
-      numCol("amount", "RM", 1.6),
-      { key: "pct", header: "%", align: "right", width: 1 },
-    ],
-    rows,
-    totals: { account: "Net Surplus/(Deficit)", amount: pl.net.toNumber(), pct: pct(pl.pct(pl.net)) },
+    associationName: fs.associationName, generatedAt: new Date(), title, subtitle: fs.period,
+    columns: [], rows: [], layout: "financial", financial: fs,
   };
 }
 
+/** Statement of income and expenditure, year to date as at r.to (or from r.from). */
+export async function profitLoss(r: Range): Promise<ReportData> {
+  const to = r.to ?? new Date().toISOString().slice(0, 10);
+  return statementExport(await incomeStatement(to, r.from), "Profit & Loss Account");
+}
+
+/** Statement of financial position as at r.to. */
 export async function balanceSheet(r: Range): Promise<ReportData> {
-  const asOf = r.to ? new Date(r.to) : new Date();
-  const accs = await accountBalances({ to: asOf });
-  const assets = accs.filter((a) => a.type === "ASSET" && !a.balance.eq(0));
-  const liabilities = accs.filter((a) => a.type === "LIABILITY" && !a.balance.eq(0));
-  const equity = accs.filter((a) => a.type === "EQUITY" && !a.balance.eq(0));
-  const income = accs.filter((a) => a.type === "INCOME");
-  const expense = accs.filter((a) => a.type === "EXPENSE");
-  const netIncome = income.reduce((s, a) => s.plus(a.balance), new Decimal(0))
-    .minus(expense.reduce((s, a) => s.plus(a.balance), new Decimal(0)));
-  const totalAssets = assets.reduce((s, a) => s.plus(a.balance), new Decimal(0));
-  const totalLiab = liabilities.reduce((s, a) => s.plus(a.balance), new Decimal(0));
-  const totalEquity = equity.reduce((s, a) => s.plus(a.balance), new Decimal(0)).plus(netIncome);
-
-  const rows: ReportData["rows"] = [];
-  const push = (heading: string, list: typeof accs) => {
-    rows.push({ section: heading, account: "", amount: "" });
-    for (const a of list) rows.push({ section: "", account: `  ${a.code} — ${a.name}`, amount: a.balance.toNumber() });
-  };
-  push("Assets", assets);
-  rows.push({ section: "Total Assets", account: "", amount: totalAssets.toNumber() });
-  push("Liabilities", liabilities);
-  rows.push({ section: "Total Liabilities", account: "", amount: totalLiab.toNumber() });
-  push("Equity", equity);
-  rows.push({ section: "", account: "  Net Income (period to date)", amount: netIncome.toNumber() });
-  rows.push({ section: "Total Equity", account: "", amount: totalEquity.toNumber() });
-
-  return {
-    ...(await base()),
-    title: "Balance Sheet",
-    subtitle: `As of ${asOf.toISOString().slice(0, 10)}`,
-    columns: [
-      { key: "section", header: "Section", width: 2 },
-      { key: "account", header: "Account", width: 4 },
-      numCol("amount", "Amount", 2),
-    ],
-    rows,
-    totals: { section: "Total Liabilities & Equity", account: "", amount: totalLiab.plus(totalEquity).toNumber() },
-  };
+  const to = r.to ?? new Date().toISOString().slice(0, 10);
+  return statementExport(await financialPosition(to), "Balance Sheet");
 }
 
 /** The general ledger for all accounts (or one), each with its balance brought forward. */

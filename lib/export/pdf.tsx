@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { ReportData } from "./types";
+import { fmtAcct, type FinancialStatement } from "../financial-statements";
 
 const styles = StyleSheet.create({
   page: { padding: 28, fontSize: 9, fontFamily: "Helvetica", color: "#111827" },
@@ -137,7 +138,66 @@ function statementPdf(data: ReportData) {
   );
 }
 
+const fin = StyleSheet.create({
+  page: { paddingTop: 40, paddingBottom: 44, paddingHorizontal: 44, fontSize: 9.5, fontFamily: "Helvetica", color: "#000" },
+  name: { fontSize: 13, fontFamily: "Helvetica-Bold" },
+  line: { fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 3 },
+  head: { flexDirection: "row", marginTop: 16, marginBottom: 4, backgroundColor: "#eef5f1", paddingVertical: 3 },
+  row: { flexDirection: "row", alignItems: "flex-start" },
+  label: { flex: 1, paddingVertical: 2.5, paddingHorizontal: 3 },
+  amount: { width: 110, paddingHorizontal: 3 },
+  pct: { width: 60, paddingHorizontal: 3, paddingVertical: 2.5, textAlign: "right" },
+  figure: { textAlign: "right", paddingVertical: 2.5 },
+  bold: { fontFamily: "Helvetica-Bold" },
+  footer: { position: "absolute", bottom: 20, right: 44, fontSize: 8, color: "#6b7280" },
+});
+
+/** Statement of income and expenditure / financial position, as the accountant lays it out. */
+function financialPdf(fs: FinancialStatement, title: string) {
+  const rule = { borderColor: "#000", borderTopWidth: 0.75 };
+  return (
+    <Document title={title} author="ResidentLedger">
+      <Page size="A4" style={fin.page} wrap>
+        <Text style={fin.name}>{fs.associationName}</Text>
+        <Text style={fin.line}>{fs.title}</Text>
+        <Text style={fin.line}>{fs.period}</Text>
+        <View style={fin.head}>
+          <Text style={fin.label} />
+          <View style={fin.amount}>
+            {fs.amountHeading.map((h) => <Text key={h} style={[fin.figure, fin.bold, { paddingVertical: 1 }]}>{h}</Text>)}
+          </View>
+          {fs.showPct && <Text style={[fin.pct, fin.bold, { alignSelf: "flex-end", paddingVertical: 1 }]}>%</Text>}
+        </View>
+        {fs.rows.map((r, i) => {
+          if (r.gap) return <View key={i} style={{ height: 8 }} />;
+          if (r.heading) return <Text key={i} style={[fin.bold, { paddingHorizontal: 3, paddingTop: 4, paddingBottom: 2.5 }]}>{r.label}</Text>;
+          const bold = r.bold ? fin.bold : {};
+          const value = r.amount ? fmtAcct(r.amount) : "";
+          return (
+            <View key={i} style={fin.row} wrap={false}>
+              <Text style={[fin.label, bold, r.indent ? { paddingLeft: 16 } : {}]}>{r.label ?? ""}</Text>
+              <View style={fin.amount}>
+                {r.rule === "double" ? (
+                  // Double underline: the figure's own rule plus a second one just below it.
+                  <View style={{ borderBottomWidth: 0.75, borderColor: "#000", paddingBottom: 1.5 }}>
+                    <Text style={[fin.figure, bold, rule, { borderBottomWidth: 0.75 }]}>{value}</Text>
+                  </View>
+                ) : (
+                  <Text style={[fin.figure, bold, r.rule ? rule : {}]}>{value}</Text>
+                )}
+              </View>
+              {fs.showPct && <Text style={[fin.pct, bold]}>{r.pct != null ? `${r.pct.toFixed(2)}%` : ""}</Text>}
+            </View>
+          );
+        })}
+        <Text style={fin.footer} fixed render={({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}`} />
+      </Page>
+    </Document>
+  );
+}
+
 export async function buildPdf(data: ReportData): Promise<Buffer> {
+  if (data.layout === "financial" && data.financial) return renderToBuffer(financialPdf(data.financial, data.title));
   if (data.layout === "statement") return renderToBuffer(statementPdf(data));
   const totalWeight = data.columns.reduce((s, c) => s + (c.width ?? 1), 0);
   const flex = (c: { width?: number }) => ({ flex: (c.width ?? 1) / totalWeight });

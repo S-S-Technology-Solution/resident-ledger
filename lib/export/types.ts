@@ -33,8 +33,11 @@ export type ReportData = {
   // "statement": an accountant's statement in the style of the old Million
   // reports — centred title, no column headings, a ruled account line
   // (accountLine left / right) above the rows.
-  layout?: "table" | "statement";
+  layout?: "table" | "statement" | "financial";
   accountLine?: { left: string; right: string };
+  // "financial": the statement of income and expenditure or of financial
+  // position, drawn from these rows instead of `columns`/`rows`.
+  financial?: import("../financial-statements").FinancialStatement;
 };
 
 /** One exportable screen or report: who may download it and how it is built. */

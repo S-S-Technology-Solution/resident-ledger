@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import type { ReportData } from "./types";
+import type { FinancialStatement } from "../financial-statements";
 
 /** The Million-style statement: centred heading, ruled account line, no column headings. */
 async function statementXlsx(data: ReportData): Promise<Buffer> {
@@ -50,7 +51,48 @@ async function statementXlsx(data: ReportData): Promise<Buffer> {
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
+/** Statement of income and expenditure / financial position, as the accountant lays it out. */
+async function financialXlsx(fs: FinancialStatement, title: string): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "ResidentLedger";
+  const ws = wb.addWorksheet(title.replace(/[*?:\\/\[\]]/g, "-").slice(0, 31));
+  ws.columns = [
+    { width: 55 },
+    { width: 17, style: { alignment: { horizontal: "right" }, numFmt: "#,##0.00;(#,##0.00)" } },
+    ...(fs.showPct ? [{ width: 10, style: { alignment: { horizontal: "right" as const }, numFmt: '0.00"%"' } }] : []),
+  ];
+  const n = fs.showPct ? 3 : 2;
+  ws.addRow([fs.associationName]).font = { bold: true, size: 13 };
+  ws.addRow([fs.title]).font = { bold: true };
+  ws.addRow([fs.period]).font = { bold: true };
+  ws.addRow([]);
+  fs.amountHeading.forEach((h, i) => {
+    const row = ws.addRow(["", h, ...(fs.showPct && i === fs.amountHeading.length - 1 ? ["%"] : [])]);
+    row.font = { bold: true };
+    for (let c = 1; c <= n; c++) {
+      row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF5F1" } };
+      if (c > 1) row.getCell(c).alignment = { horizontal: "right" };
+    }
+  });
+  for (const r of fs.rows) {
+    if (r.gap) { ws.addRow([]); continue; }
+    if (r.heading) { ws.addRow([r.label]).font = { bold: true }; continue; }
+    const row = ws.addRow([r.label ?? "", r.amount?.toNumber() ?? null, ...(fs.showPct ? [r.pct?.toDecimalPlaces(2).toNumber() ?? null] : [])]);
+    if (r.bold) row.font = { bold: true };
+    if (r.indent) row.getCell(1).alignment = { indent: 2 };
+    const fig = row.getCell(2);
+    if (r.rule === "above") fig.border = { top: { style: "thin" } };
+    if (r.rule === "double") fig.border = { top: { style: "thin" }, bottom: { style: "double" } };
+  }
+  ws.pageSetup.orientation = "portrait";
+  ws.pageSetup.fitToPage = true;
+  ws.pageSetup.fitToWidth = 1;
+  ws.pageSetup.fitToHeight = 0;
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
 export async function buildXlsx(data: ReportData): Promise<Buffer> {
+  if (data.layout === "financial" && data.financial) return financialXlsx(data.financial, data.title);
   if (data.layout === "statement") return statementXlsx(data);
   const wb = new ExcelJS.Workbook();
   wb.creator = "ResidentLedger";
