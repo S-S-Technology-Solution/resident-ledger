@@ -152,7 +152,7 @@ model FiscalYear {
 model User {
   id            String      @id @default(cuid())
   // A user signs in with either: the phone number (digits only, e.g.
-  // 0123021143) or the email address.
+  // 0123456789) or the email address.
   phone         String?     @unique
   email         String?     @unique
   passwordHash  String
