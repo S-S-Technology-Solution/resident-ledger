@@ -17,7 +17,7 @@ const schema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "Name is required"),
   phone: z.string().transform(normalisePhone)
-    .refine((p) => p === "" || isValidPhone(p), "Enter a phone number such as 012-3021143"),
+    .refine((p) => p === "" || isValidPhone(p), "Enter a phone number such as 012-3456789"),
   email: z.string().trim().toLowerCase().email("Enter a valid email address").optional().or(z.literal("")),
   role: z.enum(["ADMIN", "TREASURER", "VIEWER"]),
   password: z.string().min(8, "Use at least 8 characters").optional().or(z.literal("")),

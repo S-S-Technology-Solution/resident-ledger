@@ -30,7 +30,7 @@ export function LoginForm({ next }: { next?: string }) {
     >
       <div className="space-y-1">
         <Label htmlFor="login">Phone number or email</Label>
-        <Input id="login" type="text" autoComplete="username" required placeholder="e.g. 012-3021143"
+        <Input id="login" type="text" autoComplete="username" required placeholder="e.g. 012-3456789"
           value={login} onChange={(e) => setLogin(e.target.value)} />
       </div>
       <div className="space-y-1">

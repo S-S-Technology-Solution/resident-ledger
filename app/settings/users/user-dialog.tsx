@@ -81,7 +81,7 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="u-phone">Phone number</Label>
-              <Input id="u-phone" type="tel" placeholder="012-3021143" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Input id="u-phone" type="tel" placeholder="012-3456789" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="u-email">Email <span className="font-normal text-muted-foreground">(optional)</span></Label>
