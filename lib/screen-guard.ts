@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { canPost, getCurrentUser } from "./permissions";
-import { canSeeScreen, homeFor, type ScreenKey } from "./screens";
+import { canSeeReport, canSeeScreen, homeFor, type ScreenKey } from "./screens";
 
 /** The signed-in user, read once per request however many components ask. */
 export const currentUser = cache(getCurrentUser);
@@ -19,6 +19,13 @@ export async function requireScreen(key: ScreenKey) {
   if (canSeeScreen(user, key)) return user;
   if (key === "dashboard") redirect(homeFor(user));
   redirect(`/no-access?screen=${key}`);
+}
+
+/** Called at the top of each report: the Reports screen, and this report if particular ones are ticked. */
+export async function requireReport(key: string) {
+  const user = await requireScreen("reports");
+  if (!canSeeReport(user, key)) redirect("/reports");
+  return user;
 }
 
 /** For "new …" pages: view-only users are sent back to the list instead. */

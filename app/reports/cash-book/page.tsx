@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export default async function CashBookPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string; account?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("cash-book");
   const { from, to, account } = await searchParams;
   const { accountKey, accountLabel, fromDate, toDate, opening, rows, totalIn, totalOut, closing } =
     await cashBook({ from, to, account });

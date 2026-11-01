@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function AccountRangePage({
 }: {
   searchParams: Promise<{ fromCode?: string; toCode?: string; to?: string; zero?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("account-range");
   const { fromCode, toCode, to, zero } = await searchParams;
   const asOf = to ? new Date(to) : new Date();
   const includeZero = zero === "1";

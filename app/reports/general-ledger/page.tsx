@@ -12,7 +12,7 @@ import { AccountPicker } from "./account-picker";
 import { format } from "date-fns";
 import Decimal from "decimal.js";
 import { BookOpen } from "lucide-react";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function GLPage({
 }: {
   searchParams: Promise<{ accountId?: string; from?: string; to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("general-ledger");
   const sp = await searchParams;
   const association = await getAssociation();
   const to = sp.to || new Date().toISOString().slice(0, 10);

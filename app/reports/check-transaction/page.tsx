@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export default async function CheckTransactionPage({
 }: {
   searchParams: Promise<TransactionSearch>;
 }) {
-  await requireScreen("reports");
+  await requireReport("check-transaction");
   const search = await searchParams;
   const { q, amount, from, to, status } = search;
   const hasFilter = hasTransactionFilter(search);

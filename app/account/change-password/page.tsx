@@ -5,6 +5,7 @@ import { currentSession } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ChangePasswordForm } from "./change-password-form";
+import { signInId } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function ChangePasswordPage() {
     <div className="space-y-8">
       <PageHeader
         title="Change password"
-        description={user.email}
+        description={signInId(user)}
         actions={
           <Button asChild variant="outline">
             <Link href="/">Cancel</Link>

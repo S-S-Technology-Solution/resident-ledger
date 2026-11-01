@@ -14,9 +14,10 @@ import {
 import { toast } from "sonner";
 import { upsertUser, setUserActive } from "./actions";
 import { unwrap } from "@/lib/action";
-import { SCREENS, type ScreenKey } from "@/lib/screens";
+import { REPORTS, SCREENS, reportScreen } from "@/lib/screens";
+import { fmtPhone } from "@/lib/phone";
 
-type User = { id: string; name: string; email: string; role: UserRole; allScreens: boolean; screens: string[] };
+type User = { id: string; name: string; phone: string | null; email: string | null; role: UserRole; allScreens: boolean; screens: string[] };
 
 const ROLES: { value: UserRole; label: string; hint: string }[] = [
   { value: "ADMIN", label: "Administrator", hint: "Everything, including users, settings and year-end" },
@@ -28,21 +29,28 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [name, setName] = useState(user?.name ?? "");
+  const [phone, setPhone] = useState(user?.phone ? fmtPhone(user.phone) : "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [role, setRole] = useState<UserRole>(user?.role ?? "TREASURER");
   const [password, setPassword] = useState("");
   const [allScreens, setAllScreens] = useState(user?.allScreens ?? true);
-  const [screens, setScreens] = useState<ScreenKey[]>((user?.screens ?? []) as ScreenKey[]);
-  const toggleScreen = (k: ScreenKey) =>
+  // Screen keys, plus "report:<key>" for each report ticked under Reports.
+  const [screens, setScreens] = useState<string[]>(user?.screens ?? []);
+  const toggleScreen = (k: string) =>
     setScreens((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]));
   const groups = [...new Set(SCREENS.map((s) => s.group))];
+  const [someReports, setSomeReports] = useState((user?.screens ?? []).some((k) => k.startsWith("report:")));
+  const reportGroups = [...new Set(REPORTS.map((r) => r.group))];
+  const pickedReports = screens.filter((k) => k.startsWith("report:"));
+  const pickedScreens = screens.filter((k) => !k.startsWith("report:"));
 
   const selected = ROLES.find((r) => r.value === role);
 
   function submit() {
     start(async () => {
       try {
-        await unwrap(upsertUser({ id: user?.id, name, email, role, password: password || "", allScreens, screens }));
+        const sent = someReports ? screens : pickedScreens;
+        await unwrap(upsertUser({ id: user?.id, name, phone, email, role, password: password || "", allScreens, screens: sent }));
         toast.success(mode === "create" ? "User added" : "User updated");
         setOpen(false);
         setPassword("");
@@ -61,7 +69,7 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
           <Button size="sm" variant="outline">Edit</Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Add user" : `Edit ${user?.name}`}</DialogTitle>
         </DialogHeader>
@@ -70,9 +78,16 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
             <Label htmlFor="u-name">Name</Label>
             <Input id="u-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="u-email">Email</Label>
-            <Input id="u-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="u-phone">Phone number</Label>
+              <Input id="u-phone" type="tel" placeholder="012-3021143" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="u-email">Email <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Input id="u-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <p className="col-span-2 -mt-1 text-xs text-muted-foreground">They sign in with either one.</p>
           </div>
           <div className="space-y-1">
             <Label>Role</Label>
@@ -114,6 +129,36 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
                   ))}
                 </div>
               )}
+              {!allScreens && screens.includes("reports") && (
+                <div className="space-y-2 rounded-md border p-3">
+                  <div className="text-sm font-medium">Reports</div>
+                  <div className="flex gap-4 text-sm">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="u-reports" checked={!someReports} onChange={() => setSomeReports(false)} />
+                      All reports
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="u-reports" checked={someReports} onChange={() => setSomeReports(true)} />
+                      Only these reports
+                    </label>
+                  </div>
+                  {someReports && (
+                    <div className="grid max-h-56 grid-cols-2 gap-x-4 gap-y-3 overflow-y-auto">
+                      {reportGroups.map((g) => (
+                        <div key={g} className="space-y-1">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{g}</div>
+                          {REPORTS.filter((r) => r.group === g).map((r) => (
+                            <label key={r.key} className="flex items-center gap-2 text-sm">
+                              <input type="checkbox" checked={screens.includes(reportScreen(r.key))} onChange={() => toggleScreen(reportScreen(r.key))} />
+                              {r.title}
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {role === "VIEWER"
                   ? "A view-only user can open these screens but never change anything."
@@ -137,7 +182,10 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button
-            disabled={pending || !name || !email || (mode === "create" && password.length < 8) || (role !== "ADMIN" && !allScreens && screens.length === 0)}
+            disabled={
+              pending || !name || (!phone && !email) || (mode === "create" && password.length < 8)
+              || (role !== "ADMIN" && !allScreens && (pickedScreens.length === 0 || (screens.includes("reports") && someReports && pickedReports.length === 0)))
+            }
             onClick={submit}
           >
             {pending ? "Saving…" : "Save"}

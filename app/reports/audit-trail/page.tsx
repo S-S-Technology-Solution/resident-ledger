@@ -8,12 +8,12 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function AuditTrailPage() {
-  await requireScreen("reports");
+  await requireReport("audit-trail");
   const entries = await listAudit();
 
   return (

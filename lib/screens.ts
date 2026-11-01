@@ -45,6 +45,50 @@ export function canSeeScreen(user: ScreenAccess, key: ScreenKey) {
   return user.role === "ADMIN" || user.allScreens || user.screens.includes(key);
 }
 
+/**
+ * The reports on the Reports screen. The key is the folder under /reports and
+ * the export slug. A user with the Reports screen sees every report unless
+ * particular ones are ticked for them, held in `screens` as "report:<key>".
+ */
+export type Report = { key: string; title: string; description: string; group: string; href: string };
+
+export const REPORTS: Report[] = [
+  { key: "trial-balance", group: "Ledger", href: "/reports/trial-balance", title: "Trial Balance", description: "Debits and credits across all accounts for a period." },
+  { key: "general-ledger", group: "Ledger", href: "/reports/general-ledger", title: "General Ledger", description: "Posted transactions and running balance for an account." },
+  { key: "cash-book", group: "Ledger", href: "/reports/cash-book", title: "Cash Book", description: "Bank and cash movements with running balance, per account." },
+  { key: "cash-flow", group: "Ledger", href: "/reports/cash-flow", title: "Cash Flow Statement", description: "Where cash came from and went, between two dates." },
+  { key: "twelve-month", group: "Ledger", href: "/reports/twelve-month", title: "12-Month Transaction Summary", description: "Sales, purchases, receipts and payments month by month." },
+  { key: "account-range", group: "Ledger", href: "/reports/account-range", title: "Range of Accounts", description: "Chart of accounts with balances, between two account codes." },
+  { key: "profit-loss", group: "Profit & Loss", href: "/reports/profit-loss", title: "Profit & Loss", description: "Income and expenses with net result for a period." },
+  { key: "balance-sheet", group: "Balance Sheet", href: "/reports/balance-sheet", title: "Balance Sheet", description: "Assets, liabilities and equity as of a date." },
+  { key: "fixed-assets", group: "Balance Sheet", href: "/reports/fixed-assets", title: "Fixed Assets", description: "Cost less accumulated depreciation, with net book value." },
+  { key: "ar-ageing", group: "Receivables (AR)", href: "/reports/ar-ageing", title: "A/R Ageing Summary", description: "Outstanding resident balances bucketed by age." },
+  { key: "collection", group: "Receivables (AR)", href: "/reports/collection", title: "Collection Report", description: "Billed vs collected per resident for a period." },
+  { key: "payment-history", group: "Receivables (AR)", href: "/reports/payment-history", title: "Payment History (per Resident)", description: "All receipts and allocations for a single resident." },
+  { key: "debtor-ledger", group: "Receivables (AR)", href: "/reports/debtor-ledger?kind=debtor", title: "Debtor / Creditor Ledger", description: "Every invoice and payment for one resident or supplier, with a running balance." },
+  { key: "invoice-listing", group: "Receivables (AR)", href: "/reports/invoice-listing?view=unpaid", title: "Invoice Listing", description: "Unpaid, paid, and invoices falling due — switchable in one place." },
+  { key: "sales-report", group: "Receivables (AR)", href: "/reports/sales-report", title: "Debtors Sales Report", description: "What was invoiced to each resident, and how much has been settled." },
+  { key: "ap-ageing", group: "Payables (AP)", href: "/reports/ap-ageing", title: "A/P Ageing", description: "Open supplier bills bucketed by age." },
+  { key: "expense-by-category", group: "Payables (AP)", href: "/reports/expense-by-category", title: "Expense by Category", description: "Posted expenses grouped by chart-of-accounts category." },
+  { key: "expense-by-supplier", group: "Payables (AP)", href: "/reports/expense-by-supplier", title: "Expense by Supplier", description: "Total billed amounts grouped by supplier." },
+  { key: "bill-listing", group: "Payables (AP)", href: "/reports/bill-listing?view=unpaid", title: "Bill Listing", description: "Unpaid, paid, and bills falling due — switchable in one place." },
+  { key: "remittance-advice", group: "Payables (AP)", href: "/reports/remittance-advice", title: "Remittance Advice", description: "Which invoices a payment settled, to send on to the supplier." },
+  { key: "creditor-payments", group: "Payables (AP)", href: "/reports/creditor-payments", title: "Creditor Payments", description: "Every payment made to suppliers over a period." },
+  { key: "batch-transactions", group: "Batches", href: "/reports/batch-transactions", title: "Batch of Transactions", description: "Everything posted in one monthly batch, in detail or summary." },
+  { key: "check-transaction", group: "Enquiry", href: "/reports/check-transaction", title: "Check Transaction", description: "Find a posting by amount, reference, description or date." },
+  { key: "audit-trail", group: "Audit", href: "/reports/audit-trail", title: "Audit Trail", description: "Voids, deletions, opening balances and year-end closings." },
+];
+
+export const REPORT_KEYS = REPORTS.map((r) => r.key);
+export const reportScreen = (key: string) => `report:${key}`;
+
+export function canSeeReport(user: ScreenAccess, key: string) {
+  if (!canSeeScreen(user, "reports")) return false;
+  if (user.role === "ADMIN" || user.allScreens) return true;
+  const picked = user.screens.filter((s) => s.startsWith("report:"));
+  return picked.length === 0 || picked.includes(reportScreen(key));
+}
+
 /** The screen a path belongs to; the most specific prefix wins (/settings/users before /settings). */
 export function screenForPath(pathname: string): ScreenKey | null {
   if (pathname === "/") return "dashboard";

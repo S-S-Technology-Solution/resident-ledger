@@ -4,88 +4,28 @@ import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { requireScreen } from "@/lib/screen-guard";
+import { REPORTS, canSeeReport } from "@/lib/screens";
 
-type Item = { href: string; title: string; description: string };
-type Section = { title: string; icon: LucideIcon; items: Item[] };
-
-const sections: Section[] = [
-  {
-    title: "Ledger",
-    icon: BookOpen,
-    items: [
-      { href: "/reports/trial-balance", title: "Trial Balance", description: "Debits and credits across all accounts for a period." },
-      { href: "/reports/general-ledger", title: "General Ledger", description: "Posted transactions and running balance for an account." },
-      { href: "/reports/cash-book", title: "Cash Book", description: "Bank and cash movements with running balance, per account." },
-      { href: "/reports/cash-flow", title: "Cash Flow Statement", description: "Where cash came from and went, between two dates." },
-      { href: "/reports/twelve-month", title: "12-Month Transaction Summary", description: "Sales, purchases, receipts and payments month by month." },
-      { href: "/reports/account-range", title: "Range of Accounts", description: "Chart of accounts with balances, between two account codes." },
-    ],
-  },
-  {
-    title: "Profit & Loss",
-    icon: TrendingUp,
-    items: [
-      { href: "/reports/profit-loss", title: "Profit & Loss", description: "Income and expenses with net result for a period." },
-    ],
-  },
-  {
-    title: "Balance Sheet",
-    icon: Scale,
-    items: [
-      { href: "/reports/balance-sheet", title: "Balance Sheet", description: "Assets, liabilities and equity as of a date." },
-      { href: "/reports/fixed-assets", title: "Fixed Assets", description: "Cost less accumulated depreciation, with net book value." },
-    ],
-  },
-  {
-    title: "Receivables (AR)",
-    icon: ArrowDownRight,
-    items: [
-      { href: "/reports/ar-ageing", title: "A/R Ageing Summary", description: "Outstanding resident balances bucketed by age." },
-      { href: "/reports/collection", title: "Collection Report", description: "Billed vs collected per resident for a period." },
-      { href: "/reports/payment-history", title: "Payment History (per Resident)", description: "All receipts and allocations for a single resident." },
-      { href: "/reports/debtor-ledger?kind=debtor", title: "Debtor Ledger", description: "Every invoice and payment for one resident, with a running balance." },
-      { href: "/reports/invoice-listing?view=unpaid", title: "Invoice Listing", description: "Unpaid, paid, and invoices falling due — switchable in one place." },
-      { href: "/reports/sales-report", title: "Debtors Sales Report", description: "What was invoiced to each resident, and how much has been settled." },
-    ],
-  },
-  {
-    title: "Payables (AP)",
-    icon: ArrowUpRight,
-    items: [
-      { href: "/reports/ap-ageing", title: "A/P Ageing", description: "Open supplier bills bucketed by age." },
-      { href: "/reports/expense-by-category", title: "Expense by Category", description: "Posted expenses grouped by chart-of-accounts category." },
-      { href: "/reports/expense-by-supplier", title: "Expense by Supplier", description: "Total billed amounts grouped by supplier." },
-      { href: "/reports/debtor-ledger?kind=creditor", title: "Creditor Ledger", description: "Every invoice and payment for one supplier, with a running balance." },
-      { href: "/reports/bill-listing?view=unpaid", title: "Bill Listing", description: "Unpaid, paid, and bills falling due — switchable in one place." },
-      { href: "/reports/remittance-advice", title: "Remittance Advice", description: "Which invoices a payment settled, to send on to the supplier." },
-      { href: "/reports/creditor-payments", title: "Creditor Payments", description: "Every payment made to suppliers over a period." },
-    ],
-  },
-  {
-    title: "Batches",
-    icon: Layers,
-    items: [
-      { href: "/reports/batch-transactions", title: "Batch of Transactions", description: "Everything posted in one monthly batch, in detail or summary." },
-    ],
-  },
-  {
-    title: "Enquiry",
-    icon: Search,
-    items: [
-      { href: "/reports/check-transaction", title: "Check Transaction", description: "Find a posting by amount, reference, description or date." },
-    ],
-  },
-  {
-    title: "Audit",
-    icon: ShieldCheck,
-    items: [
-      { href: "/reports/audit-trail", title: "Audit Trail", description: "Voids, deletions, opening balances and year-end closings." },
-    ],
-  },
-];
+// Section icons; the reports themselves are listed in lib/screens.ts.
+const ICONS: Record<string, LucideIcon> = {
+  Ledger: BookOpen,
+  "Profit & Loss": TrendingUp,
+  "Balance Sheet": Scale,
+  "Receivables (AR)": ArrowDownRight,
+  "Payables (AP)": ArrowUpRight,
+  Batches: Layers,
+  Enquiry: Search,
+  Audit: ShieldCheck,
+};
 
 export default async function ReportsIndex() {
-  await requireScreen("reports");
+  const user = await requireScreen("reports");
+  const shown = REPORTS.filter((r) => canSeeReport(user, r.key));
+  const sections = [...new Set(shown.map((r) => r.group))].map((title) => ({
+    title,
+    icon: ICONS[title] ?? BookOpen,
+    items: shown.filter((r) => r.group === title),
+  }));
   return (
     <div className="space-y-8">
       <PageHeader title="Reports" />
@@ -103,7 +43,7 @@ export default async function ReportsIndex() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {section.items.map((item) => (
-                <Link key={item.href} href={item.href} className="group">
+                <Link key={item.key} href={item.href} className="group">
                   <Card className="h-full transition-colors hover:border-foreground/20 hover:bg-accent/40">
                     <CardContent className="flex items-start justify-between gap-3 p-4">
                       <div className="min-w-0">

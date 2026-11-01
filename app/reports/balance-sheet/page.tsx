@@ -5,7 +5,7 @@ import { FinancialStatementView } from "../_components/financial-statement";
 import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export default async function BSPage({
 }: {
   searchParams: Promise<{ to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("balance-sheet");
   const sp = await searchParams;
   const to = sp.to || new Date().toISOString().slice(0, 10);
   const fs = await financialPosition(to);

@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { FileText } from "lucide-react";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ export default async function APAgeingPage({
 }: {
   searchParams: Promise<{ to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("ap-ageing");
   const { to } = await searchParams;
   const asOf = to ? new Date(to) : new Date();
 

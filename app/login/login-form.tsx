@@ -9,13 +9,13 @@ import { loginAction } from "./actions";
 
 export function LoginForm({ next }: { next?: string }) {
   const [pending, start] = useTransition();
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
 
   function submit() {
     start(async () => {
       const fd = new FormData();
-      fd.set("email", email);
+      fd.set("login", login);
       fd.set("password", password);
       if (next) fd.set("next", next);
       const res = await loginAction(fd);
@@ -29,16 +29,16 @@ export function LoginForm({ next }: { next?: string }) {
       onSubmit={(e) => { e.preventDefault(); submit(); }}
     >
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" autoComplete="username" required
-          value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Label htmlFor="login">Phone number or email</Label>
+        <Input id="login" type="text" autoComplete="username" required placeholder="e.g. 012-3021143"
+          value={login} onChange={(e) => setLogin(e.target.value)} />
       </div>
       <div className="space-y-1">
         <Label htmlFor="password">Password</Label>
         <Input id="password" type="password" autoComplete="current-password" required
           value={password} onChange={(e) => setPassword(e.target.value)} />
       </div>
-      <Button type="submit" disabled={pending || !email || !password} className="w-full">
+      <Button type="submit" disabled={pending || !login || !password} className="w-full">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
     </form>

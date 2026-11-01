@@ -8,9 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserDialog, ToggleUserButton } from "./user-dialog";
 import { requireScreen } from "@/lib/screen-guard";
-import { SCREENS } from "@/lib/screens";
+import { REPORTS, SCREENS } from "@/lib/screens";
+import { fmtPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
+
+/** "Reports (Trial Balance, Profit & Loss), Receipts" */
+function screenSummary(screens: string[]) {
+  const reports = REPORTS.filter((r) => screens.includes(`report:${r.key}`)).map((r) => r.title);
+  return SCREENS.filter((s) => screens.includes(s.key))
+    .map((s) => (s.key === "reports" && reports.length ? `Reports (${reports.join(", ")})` : s.label))
+    .join(", ");
+}
 
 export default async function UsersPage() {
   await requireScreen("users");
@@ -43,7 +52,7 @@ export default async function UsersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>Sign in with</TableHead>
               <TableHead className="w-40">Role</TableHead>
               <TableHead>Screens</TableHead>
               <TableHead className="w-28">Status</TableHead>
@@ -58,7 +67,10 @@ export default async function UsersPage() {
                   {u.name}
                   {u.id === me?.id && <span className="ml-2 text-xs text-muted-foreground">you</span>}
                 </TableCell>
-                <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {u.phone && <div>{fmtPhone(u.phone)}</div>}
+                  {u.email && <div className="text-xs">{u.email}</div>}
+                </TableCell>
                 <TableCell>
                   <Badge variant={u.role === "ADMIN" ? "default" : "outline"}>
                     {ROLE_LABEL[u.role]}
@@ -67,7 +79,7 @@ export default async function UsersPage() {
                 <TableCell className="whitespace-normal text-xs text-muted-foreground">
                   {u.role === "ADMIN" || u.allScreens
                     ? "All"
-                    : SCREENS.filter((s) => u.screens.includes(s.key)).map((s) => s.label).join(", ")}
+                    : screenSummary(u.screens)}
                 </TableCell>
                 <TableCell>
                   {u.active ? <Badge>Active</Badge> : <Badge variant="outline">Disabled</Badge>}
@@ -80,7 +92,7 @@ export default async function UsersPage() {
                     <>
                       <UserDialog
                         mode="edit"
-                        user={{ id: u.id, name: u.name, email: u.email, role: u.role, allScreens: u.allScreens, screens: u.screens }}
+                        user={{ id: u.id, name: u.name, phone: u.phone, email: u.email, role: u.role, allScreens: u.allScreens, screens: u.screens }}
                       />
                       {u.id !== me?.id && <ToggleUserButton id={u.id} active={u.active} />}
                     </>

@@ -11,7 +11,7 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function CreditorPaymentsPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("creditor-payments");
   const { from, to } = await searchParams;
   const fromDate = from ? new Date(from) : undefined;
   const toDate = to ? new Date(to) : undefined;

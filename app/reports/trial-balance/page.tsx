@@ -9,7 +9,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Button } from "@/components/ui/button";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function TrialBalancePage({
 }: {
   searchParams: Promise<{ view?: string; from?: string; to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("trial-balance");
   const sp = await searchParams;
   const view = sp.view === "movement" ? "movement" : "asAt";
   const to = sp.to || new Date().toISOString().slice(0, 10);

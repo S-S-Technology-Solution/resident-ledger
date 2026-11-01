@@ -151,14 +151,18 @@ model FiscalYear {
 
 model User {
   id            String      @id @default(cuid())
-  email         String      @unique
+  // A user signs in with either: the phone number (digits only, e.g.
+  // 0123021143) or the email address.
+  phone         String?     @unique
+  email         String?     @unique
   passwordHash  String
   name          String
   role          UserRole    @default(ADMIN)
   active        Boolean     @default(true)
   // Screens this user may open. Administrators always see everything; anyone
   // else sees every screen when allScreens is true, otherwise only those listed
-  // (keys from lib/screens.ts).
+  // (keys from lib/screens.ts). With the Reports screen, "report:<key>"
+  // entries limit it to those reports.
   allScreens    Boolean     @default(true)
   screens       String[]    @default([])
   associationId String

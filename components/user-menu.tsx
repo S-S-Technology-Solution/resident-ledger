@@ -11,6 +11,7 @@ import {
 import { KeyRound, Settings } from "lucide-react";
 import Link from "next/link";
 import { SignOutItem } from "./sign-out-item";
+import { signInId } from "@/lib/phone";
 
 export async function UserMenu() {
   const session = await currentSession();
@@ -39,7 +40,7 @@ export async function UserMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col">
           <span className="font-medium">{user.name}</span>
-          <span className="text-xs font-normal text-muted-foreground">{user.email}</span>
+          <span className="text-xs font-normal text-muted-foreground">{signInId(user)}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

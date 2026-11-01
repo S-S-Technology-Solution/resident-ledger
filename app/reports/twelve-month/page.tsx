@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export default async function TwelveMonthPage({
 }: {
   searchParams: Promise<{ year?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("twelve-month");
   const { year: rawYear } = await searchParams;
   const year = rawYear ? Number(rawYear) : new Date().getFullYear();
 

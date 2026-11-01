@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function CashFlowPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("cash-flow");
   const { from, to } = await searchParams;
   const { cashAccounts, fromDate, toDate, opening, inflows, outflows, movement, closing } = await cashFlow({ from, to });
 

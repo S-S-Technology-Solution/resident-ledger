@@ -11,7 +11,7 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export default async function SubsidiaryLedgerPage({
 }: {
   searchParams: Promise<{ kind?: string; id?: string; from?: string; to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("debtor-ledger");
   const { kind: rawKind, id, from, to } = await searchParams;
   const kind = rawKind === "creditor" ? "creditor" : "debtor";
   const range = { from: from ? new Date(from) : undefined, to: to ? new Date(to) : undefined };

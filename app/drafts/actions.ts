@@ -36,7 +36,7 @@ export async function postDrafts(ids: string[]) {
       if (!d) continue;
       try {
         posted.push(await postDraft(id));
-        await recordAudit("draft", id, "post", { after: { kind: d.kind, number: d.number, amount: d.amount.toString(), postedBy: user.email } });
+        await recordAudit("draft", id, "post", { after: { kind: d.kind, number: d.number, amount: d.amount.toString(), postedBy: user.email ?? user.phone } });
       } catch (e) {
         failed.push({ number: d.number, error: e instanceof Error && e.constructor === Error ? e.message : "could not be posted" });
       }

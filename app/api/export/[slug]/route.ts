@@ -3,7 +3,7 @@ import { buildXlsx } from "@/lib/export/excel";
 import { buildPdf } from "@/lib/export/pdf";
 import { EXPORTS } from "@/lib/export/registry";
 import { getCurrentUser } from "@/lib/permissions";
-import { canSeeScreen } from "@/lib/screens";
+import { canSeeReport, canSeeScreen } from "@/lib/screens";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +11,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const { slug } = await params;
   const def = EXPORTS[slug];
   if (!def) return NextResponse.json({ error: `Unknown export ${slug}` }, { status: 404 });
-  // Each export belongs to a screen; you can download it if you can open that screen.
+  // Each export belongs to a screen; you can download it if you can open that
+  // screen (for a report, that report).
   const user = await getCurrentUser();
-  if (!user || !user.active || !canSeeScreen(user, def.screen)) {
+  const allowed = user && user.active && (def.screen === "reports" ? canSeeReport(user, slug) : canSeeScreen(user, def.screen));
+  if (!allowed) {
     return NextResponse.json({ error: "You don't have access to this screen." }, { status: 403 });
   }
   const sp = req.nextUrl.searchParams;

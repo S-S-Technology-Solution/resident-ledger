@@ -12,7 +12,7 @@ import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
 import { remittancePayments } from "@/lib/report-queries";
 import { DateRange } from "../_components/date-range";
-import { requireScreen } from "@/lib/screen-guard";
+import { requireReport } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function RemittanceAdvicePage({
 }: {
   searchParams: Promise<{ supplierId?: string; from?: string; to?: string }>;
 }) {
-  await requireScreen("reports");
+  await requireReport("remittance-advice");
   const { supplierId, from, to } = await searchParams;
 
   const [suppliers, association] = await Promise.all([
