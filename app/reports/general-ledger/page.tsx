@@ -13,6 +13,8 @@ import { format } from "date-fns";
 import Decimal from "decimal.js";
 import { BookOpen } from "lucide-react";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { entryHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -85,8 +87,8 @@ export default async function GLPage({
                 <TableRow key={i}>
                   <TableCell>{format(r.date, "dd/MM/yyyy")}</TableCell>
                   <TableCell className="font-mono text-xs">{r.batch}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.ref}</TableCell>
-                  <TableCell className="whitespace-normal">{r.description}</TableCell>
+                  <TableCell className="font-mono text-xs"><DrillLink href={entryHref(r.entryId)}>{r.ref}</DrillLink></TableCell>
+                  <TableCell className="whitespace-normal"><DrillLink href={entryHref(r.entryId)}>{r.description}</DrillLink></TableCell>
                   <TableCell className="text-right font-mono tabular">{r.debit.gt(0) ? fmtRM(r.debit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{r.credit.gt(0) ? fmtRM(r.credit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{side(r.balance)}</TableCell>

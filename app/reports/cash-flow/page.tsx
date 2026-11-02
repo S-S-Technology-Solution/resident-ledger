@@ -7,6 +7,8 @@ import { DataCard } from "@/components/data-card";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { glHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,8 @@ export default async function CashFlowPage({
   await requireReport("cash-flow");
   const { from, to } = await searchParams;
   const { cashAccounts, fromDate, toDate, opening, inflows, outflows, movement, closing } = await cashFlow({ from, to });
+
+  const period = { from: fromDate?.toISOString().slice(0, 10), to: toDate.toISOString().slice(0, 10) };
 
   const description = fromDate
     ? `${format(fromDate, "dd MMM yyyy")} to ${format(toDate, "dd MMM yyyy")}`
@@ -59,7 +63,7 @@ export default async function CashFlowPage({
             {inflows.map((r) => (
               <TableRow key={`in-${r.code}`}>
                 <TableCell className="font-mono text-muted-foreground">{r.code}</TableCell>
-                <TableCell>{r.name}</TableCell>
+                <TableCell><DrillLink href={glHref(r.id, period)}>{r.name}</DrillLink></TableCell>
                 <TableCell className="text-right font-mono tabular">
                   {fmtRM(r.inflow.minus(r.outflow))}
                 </TableCell>
@@ -81,7 +85,7 @@ export default async function CashFlowPage({
             {outflows.map((r) => (
               <TableRow key={`out-${r.code}`}>
                 <TableCell className="font-mono text-muted-foreground">{r.code}</TableCell>
-                <TableCell>{r.name}</TableCell>
+                <TableCell><DrillLink href={glHref(r.id, period)}>{r.name}</DrillLink></TableCell>
                 <TableCell className="text-right font-mono tabular">
                   ({fmtRM(r.outflow.minus(r.inflow))})
                 </TableCell>

@@ -10,10 +10,13 @@ import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { debtorHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
 type Row = {
+  id: string;
   unit: string;
   owner: string;
   current: Decimal;
@@ -72,7 +75,7 @@ export default async function ARAgeingPage({
       if (unapplied.gt(0)) buckets.current = buckets.current.minus(unapplied);
     }
     const total = buckets.current.plus(buckets.d1_30).plus(buckets.d31_60).plus(buckets.d61_90).plus(buckets.d90p);
-    return { unit: r.unitAddress, owner: r.ownerName, ...buckets, total };
+    return { id: r.id, unit: r.unitAddress, owner: r.ownerName, ...buckets, total };
   }).filter((r) => !r.total.eq(0)).sort((a, b) => {
     const key = (addr: string): [number, number, string] => {
       const jm = addr.match(/Jln\s+\d+\/(\d+)/i) ?? addr.match(/Jalan\s+\d+\/(\d+)/i);
@@ -128,14 +131,16 @@ export default async function ARAgeingPage({
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.unit}>
-                <TableCell>{r.unit}</TableCell>
+                <TableCell><DrillLink href={debtorHref(r.id, { to })}>{r.unit}</DrillLink></TableCell>
                 <TableCell className="text-muted-foreground">{r.owner}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.current)}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.d1_30)}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.d31_60)}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.d61_90)}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.d90p)}</TableCell>
-                <TableCell className="text-right font-mono tabular font-semibold">{fmtRM(r.total)}</TableCell>
+                <TableCell className="text-right font-mono tabular font-semibold">
+                  <DrillLink href={debtorHref(r.id, { to })}>{fmtRM(r.total)}</DrillLink>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

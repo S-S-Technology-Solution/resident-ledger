@@ -8,6 +8,8 @@ import { DataCard } from "@/components/data-card";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { entryHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -81,9 +83,9 @@ export default async function CashBookPage({
               rows.map((r) => (
                 <TableRow key={r.key}>
                   <TableCell>{format(r.date, "dd MMM yyyy")}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.voucher}</TableCell>
+                  <TableCell className="font-mono text-xs"><DrillLink href={entryHref(r.entryId)}>{r.voucher}</DrillLink></TableCell>
                   <TableCell>{r.payee}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.description}</TableCell>
+                  <TableCell className="text-muted-foreground"><DrillLink href={entryHref(r.entryId)}>{r.description}</DrillLink></TableCell>
                   <TableCell className="text-right font-mono tabular">{r.debit.gt(0) ? fmtRM(r.debit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{r.credit.gt(0) ? fmtRM(r.credit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{fmtRM(r.balance)}</TableCell>

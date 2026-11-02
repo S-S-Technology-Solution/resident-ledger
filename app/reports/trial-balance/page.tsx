@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Button } from "@/components/ui/button";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { glHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +84,7 @@ export default async function TrialBalancePage({
               {rows.filter((r) => !r.closing.eq(0)).map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono">{r.code}</TableCell>
-                  <TableCell>{r.name}</TableCell>
+                  <TableCell><DrillLink href={glHref(r.id, { to })}>{r.name}</DrillLink></TableCell>
                   <TableCell className="text-right font-mono tabular">{r.closing.gt(0) ? fmtRM(r.closing) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{r.closing.lt(0) ? fmtRM(r.closing.neg()) : ""}</TableCell>
                 </TableRow>
@@ -112,7 +114,7 @@ export default async function TrialBalancePage({
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono">{r.code}</TableCell>
-                  <TableCell className="whitespace-normal">{r.name}</TableCell>
+                  <TableCell className="whitespace-normal"><DrillLink href={glHref(r.id, { from, to })}>{r.name}</DrillLink></TableCell>
                   <TableCell className="text-right font-mono tabular">{side(r.opening)}</TableCell>
                   <TableCell className="text-right font-mono tabular">{r.debit.gt(0) ? fmtRM(r.debit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{r.credit.gt(0) ? fmtRM(r.credit) : ""}</TableCell>

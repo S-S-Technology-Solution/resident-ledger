@@ -10,6 +10,8 @@ import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { glHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +63,8 @@ export default async function FixedAssetsPage({
     // Depreciation sits credit-side, so flip the sign to show it as a positive figure.
     const accumulated = depn ? balanceOf(depn).negated() : new Decimal(0);
     return {
+      id: c.id,
+      depnId: depn?.id ?? null,
       code: c.code,
       name: c.name,
       depnCode: depn?.code ?? null,
@@ -99,11 +103,11 @@ export default async function FixedAssetsPage({
             {visible.map((r) => (
               <TableRow key={r.code}>
                 <TableCell className="font-mono text-muted-foreground">{r.code}</TableCell>
-                <TableCell>{r.name}</TableCell>
+                <TableCell><DrillLink href={glHref(r.id, { to })}>{r.name}</DrillLink></TableCell>
                 <TableCell className="font-mono text-muted-foreground">{r.depnCode ?? "—"}</TableCell>
-                <TableCell className="text-right font-mono tabular">{fmtRM(r.cost)}</TableCell>
+                <TableCell className="text-right font-mono tabular"><DrillLink href={glHref(r.id, { to })}>{fmtRM(r.cost)}</DrillLink></TableCell>
                 <TableCell className="text-right font-mono tabular">
-                  {r.accumulated.isZero() ? "—" : `(${fmtRM(r.accumulated)})`}
+                  {r.accumulated.isZero() || !r.depnId ? "—" : <DrillLink href={glHref(r.depnId, { to })}>({fmtRM(r.accumulated)})</DrillLink>}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular font-medium">
                   {fmtRM(r.nbv)}

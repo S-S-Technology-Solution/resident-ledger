@@ -12,6 +12,8 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { entryHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +113,7 @@ export default async function CheckTransactionPage({
                 <TableRow key={e.id} className={e.status === "VOIDED" ? "opacity-60" : ""}>
                   <TableCell>{format(e.date, "dd MMM yyyy")}</TableCell>
                   <TableCell className="font-mono">
-                    <Link href={`/journal/${e.id}`} className="hover:underline">{e.entryNo}</Link>
+                    <DrillLink href={entryHref(e.id)}>{e.entryNo}</DrillLink>
                   </TableCell>
                   <TableCell className="font-mono text-muted-foreground">
                     {e.batch?.batchNo ?? "—"}

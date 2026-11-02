@@ -114,6 +114,7 @@ export async function cashBook(r: { from?: string; to?: string; account?: string
     }
     return {
       key: l.id,
+      entryId: l.entryId,
       date: l.entry.date,
       voucher,
       payee,
@@ -182,7 +183,7 @@ export async function cashFlow(r: { from?: string; to?: string }) {
   const opening = sumLines(openingLines);
 
   // Group the movement by the account on the other side of each cash line.
-  const buckets = new Map<string, { code: string; name: string; type: string; inflow: Decimal; outflow: Decimal }>();
+  const buckets = new Map<string, { id: string; code: string; name: string; type: string; inflow: Decimal; outflow: Decimal }>();
 
   for (const line of cashLines) {
     const net = new Decimal(line.debit.toString()).minus(new Decimal(line.credit.toString()));
@@ -201,7 +202,7 @@ export async function cashFlow(r: { from?: string; to?: string }) {
       const portion = net.times(share).dividedBy(otherTotal);
       const key = o.account.code;
       const b = buckets.get(key) ?? {
-        code: o.account.code, name: o.account.name, type: o.account.type,
+        id: o.account.id, code: o.account.code, name: o.account.name, type: o.account.type,
         inflow: new Decimal(0), outflow: new Decimal(0),
       };
       if (portion.gt(0)) b.inflow = b.inflow.plus(portion);

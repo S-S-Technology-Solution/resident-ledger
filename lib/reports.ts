@@ -138,7 +138,7 @@ export type LedgerSection = {
   account: { id: string; code: string; name: string };
   /** Balance brought forward, debit-positive. */
   opening: Decimal;
-  rows: { date: Date; batch: string; ref: string; description: string; debit: Decimal; credit: Decimal; balance: Decimal }[];
+  rows: { entryId: string; date: Date; batch: string; ref: string; description: string; debit: Decimal; credit: Decimal; balance: Decimal }[];
   debit: Decimal;
   credit: Decimal;
   closing: Decimal;
@@ -182,6 +182,7 @@ export async function generalLedgerAll(range: Range & { accountId?: string } = {
         running = running.plus(d).minus(c);
         debit = debit.plus(d); credit = credit.plus(c);
         return {
+          entryId: l.entryId,
           date: l.entry.date,
           batch: l.entry.batch?.batchNo ?? "",
           ref: l.entry.reference ?? l.entry.entryNo,

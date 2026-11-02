@@ -11,6 +11,8 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { FileText } from "lucide-react";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { creditorHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -42,12 +44,12 @@ export default async function APAgeingPage({
     orderBy: [{ supplier: { name: "asc" } }, { date: "asc" }],
   });
 
-  type Row = { supplier: string; invoiceNo: string; date: Date; open: Decimal; bucket: ReturnType<typeof bucketKey> };
+  type Row = { billId: string; supplierId: string; supplier: string; invoiceNo: string; date: Date; open: Decimal; bucket: ReturnType<typeof bucketKey> };
   const rows: Row[] = bills.flatMap((b) => {
     const paidAsOf = b.payments.reduce((s, p) => s.plus(new Decimal(p.amount.toString())), new Decimal(0));
     const open = new Decimal(b.amount.toString()).minus(paidAsOf);
     if (open.lte(0)) return [];
-    return [{ supplier: b.supplier.name, invoiceNo: b.invoiceNo, date: b.date, open, bucket: bucketKey(b.date, asOf) }];
+    return [{ billId: b.id, supplierId: b.supplierId, supplier: b.supplier.name, invoiceNo: b.invoiceNo, date: b.date, open, bucket: bucketKey(b.date, asOf) }];
   });
 
   const totals = rows.reduce(
@@ -84,8 +86,8 @@ export default async function APAgeingPage({
           <TableBody>
             {rows.map((r, i) => (
               <TableRow key={i}>
-                <TableCell>{r.supplier}</TableCell>
-                <TableCell className="font-mono">{r.invoiceNo}</TableCell>
+                <TableCell><DrillLink href={creditorHref(r.supplierId, { to })}>{r.supplier}</DrillLink></TableCell>
+                <TableCell className="font-mono"><DrillLink href={`/bills/${r.billId}`}>{r.invoiceNo}</DrillLink></TableCell>
                 <TableCell>{format(r.date, "dd MMM yyyy")}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.open)}</TableCell>
                 <TableCell>

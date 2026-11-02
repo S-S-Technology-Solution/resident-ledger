@@ -1,4 +1,5 @@
 import { fmtAcct, type FinancialStatement } from "@/lib/financial-statements";
+import { DrillLink } from "@/components/drill-link";
 
 /** A financial statement laid out as the accountant prints it. */
 export function FinancialStatementView({ fs }: { fs: FinancialStatement }) {
@@ -27,9 +28,15 @@ export function FinancialStatementView({ fs }: { fs: FinancialStatement }) {
             : "";
           return (
             <tr key={i} className={r.bold ? "font-semibold" : ""}>
-              <td className={`py-1 pr-3 ${r.indent ? "pl-8" : "pl-3"}`}>{r.label}</td>
+              <td className={`py-1 pr-3 ${r.indent ? "pl-8" : "pl-3"}`}>
+                {r.href ? <DrillLink href={r.href}>{r.label}</DrillLink> : r.label}
+              </td>
               <td className="px-3 py-0">
-                {r.amount && <div className={`py-1 text-right font-mono tabular ${rule}`}>{fmtAcct(r.amount)}</div>}
+                {r.amount && (
+                  <div className={`py-1 text-right font-mono tabular ${rule}`}>
+                    {r.href ? <DrillLink href={r.href}>{fmtAcct(r.amount)}</DrillLink> : fmtAcct(r.amount)}
+                  </div>
+                )}
               </td>
               {fs.showPct && (
                 <td className="px-3 py-1 text-right font-mono tabular">

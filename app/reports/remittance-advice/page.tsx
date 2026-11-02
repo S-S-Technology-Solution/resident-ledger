@@ -13,6 +13,8 @@ import { ExportButtons } from "@/components/export-buttons";
 import { remittancePayments } from "@/lib/report-queries";
 import { DateRange } from "../_components/date-range";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { entryHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -137,12 +139,12 @@ export default async function RemittanceAdvicePage({
                 {payments.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{format(p.date, "dd MMM yyyy")}</TableCell>
-                    <TableCell className="font-mono">{p.bill.invoiceNo}</TableCell>
+                    <TableCell className="font-mono"><DrillLink href={`/bills/${p.billId}`}>{p.bill.invoiceNo}</DrillLink></TableCell>
                     <TableCell className="text-muted-foreground">{p.method}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">
                       {p.bankRef ?? "—"}
                     </TableCell>
-                    <TableCell className="text-right font-mono tabular">{fmtRM(p.amount)}</TableCell>
+                    <TableCell className="text-right font-mono tabular">{p.entryId ? <DrillLink href={entryHref(p.entryId)}>{fmtRM(p.amount)}</DrillLink> : fmtRM(p.amount)}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow>

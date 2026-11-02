@@ -9,6 +9,8 @@ import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { glHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +41,7 @@ export default async function ExpenseByCategoryPage({
   const rows = accounts.map((a) => {
     const d = a.lines.reduce((s, l) => s.plus(new Decimal(l.debit.toString())), new Decimal(0));
     const c = a.lines.reduce((s, l) => s.plus(new Decimal(l.credit.toString())), new Decimal(0));
-    return { code: a.code, name: a.name, amount: d.minus(c) };
+    return { id: a.id, code: a.code, name: a.name, amount: d.minus(c) };
   }).filter((r) => !r.amount.eq(0));
 
   const total = rows.reduce((s, r) => s.plus(r.amount), new Decimal(0));
@@ -69,7 +71,7 @@ export default async function ExpenseByCategoryPage({
             {rows.map((r) => (
               <TableRow key={r.code}>
                 <TableCell className="font-mono">{r.code}</TableCell>
-                <TableCell>{r.name}</TableCell>
+                <TableCell><DrillLink href={glHref(r.id, { from, to })}>{r.name}</DrillLink></TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.amount)}</TableCell>
               </TableRow>
             ))}

@@ -11,6 +11,8 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { entryHref, glHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -138,7 +140,7 @@ export default async function BatchTransactionsPage({
                     <TableRow key={e.id}>
                       <TableCell>{format(e.date, "dd MMM yyyy")}</TableCell>
                       <TableCell className="font-mono">
-                        <Link href={`/journal/${e.id}`} className="hover:underline">{e.entryNo}</Link>
+                        <DrillLink href={entryHref(e.id)}>{e.entryNo}</DrillLink>
                       </TableCell>
                       <TableCell>{e.description}</TableCell>
                       <TableCell className="text-right font-mono tabular">{fmtRM(entryDr)}</TableCell>
@@ -151,12 +153,12 @@ export default async function BatchTransactionsPage({
                     <TableCell>{i === 0 ? format(e.date, "dd MMM yyyy") : ""}</TableCell>
                     <TableCell className="font-mono">
                       {i === 0 ? (
-                        <Link href={`/journal/${e.id}`} className="hover:underline">{e.entryNo}</Link>
+                        <DrillLink href={entryHref(e.id)}>{e.entryNo}</DrillLink>
                       ) : ""}
                     </TableCell>
                     <TableCell className="font-mono text-muted-foreground">{l.account.code}</TableCell>
                     <TableCell>
-                      {i === 0 ? e.description : <span className="text-muted-foreground">{l.account.name}</span>}
+                      {i === 0 ? e.description : <DrillLink href={glHref(l.account.id)} className="text-muted-foreground">{l.account.name}</DrillLink>}
                       {l.memo && i > 0 ? ` — ${l.memo}` : ""}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular">

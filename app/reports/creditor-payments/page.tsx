@@ -12,6 +12,8 @@ import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { creditorHref, entryHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +81,7 @@ export default async function CreditorPaymentsPage({
             {payments.map((p) => (
               <TableRow key={p.id}>
                 <TableCell>{format(p.date, "dd MMM yyyy")}</TableCell>
-                <TableCell>{p.bill.supplier.name}</TableCell>
+                <TableCell><DrillLink href={creditorHref(p.bill.supplierId, { from, to })}>{p.bill.supplier.name}</DrillLink></TableCell>
                 <TableCell className="font-mono text-muted-foreground">
                   {p.bill.supplier.creditorCode ?? "—"}
                 </TableCell>
@@ -91,7 +93,7 @@ export default async function CreditorPaymentsPage({
                 <TableCell className="text-muted-foreground">{p.method}</TableCell>
                 <TableCell className="font-mono text-muted-foreground">{p.bankRef ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{p.cleared ? "Yes" : "—"}</TableCell>
-                <TableCell className="text-right font-mono tabular">{fmtRM(p.amount)}</TableCell>
+                <TableCell className="text-right font-mono tabular">{p.entryId ? <DrillLink href={entryHref(p.entryId)}>{fmtRM(p.amount)}</DrillLink> : fmtRM(p.amount)}</TableCell>
               </TableRow>
             ))}
             {payments.length > 0 && (

@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 import { accountBalances, type AccountBalance } from "./reports";
 import { getAssociation } from "./association";
 import { fmtRM } from "./money";
+import { glHref } from "./drill";
 
 /**
  * The two financial statements in the accountant's layout: the Statement of
@@ -20,6 +21,8 @@ export type FsRow = {
   // Rule over the figure; "double" also closes it with a double underline.
   rule?: "above" | "double";
   gap?: boolean;
+  // On screen, what the line opens when clicked (the account's ledger).
+  href?: string;
 };
 
 export type FinancialStatement = {
@@ -80,7 +83,9 @@ export async function incomeStatement(to: string, from?: string): Promise<Financ
 
   const base = totalOf(income);
   const pct = (v: Decimal) => (base.eq(0) ? null : v.div(base).times(100));
-  const item = (a: AccountBalance): FsRow => ({ label: a.name, amount: a.balance, pct: pct(a.balance), indent: true });
+  const item = (a: AccountBalance): FsRow => ({
+    label: a.name, amount: a.balance, pct: pct(a.balance), indent: true, href: glHref(a.id, { from: start, to }),
+  });
   const rows: FsRow[] = [];
 
   rows.push({ label: "Income", heading: true });
@@ -146,7 +151,7 @@ export async function financialPosition(to: string): Promise<FinancialStatement>
     .plus(totalOf(all.filter((a) => a.type === "INCOME")))
     .minus(totalOf(all.filter((a) => a.type === "EXPENSE")));
 
-  const item = (a: AccountBalance): FsRow => ({ label: a.name, amount: a.balance });
+  const item = (a: AccountBalance): FsRow => ({ label: a.name, amount: a.balance, href: glHref(a.id, { to }) });
   const rows: FsRow[] = [];
 
   const d = totalOf(nonCurrent);
@@ -175,7 +180,7 @@ export async function financialPosition(to: string): Promise<FinancialStatement>
     { gap: true },
     { label: "ACCUMULATED FUNDS", heading: true },
     ...funds.map(item),
-    { label: "Accumulated Surplus / (Deficit) carried forward", amount: surplus },
+    { label: "Accumulated Surplus / (Deficit) carried forward", amount: surplus, href: `/reports/profit-loss?to=${to}` },
     { amount: fundTotal, rule: "double", bold: true },
   );
 

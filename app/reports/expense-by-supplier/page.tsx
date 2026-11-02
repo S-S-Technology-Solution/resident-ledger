@@ -9,6 +9,8 @@ import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { creditorHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +32,9 @@ export default async function ExpenseBySupplierPage({
     include: { supplier: true },
   });
 
-  const byId = new Map<string, { name: string; total: Decimal; count: number }>();
+  const byId = new Map<string, { id: string; name: string; total: Decimal; count: number }>();
   for (const b of bills) {
-    const existing = byId.get(b.supplierId) ?? { name: b.supplier.name, total: new Decimal(0), count: 0 };
+    const existing = byId.get(b.supplierId) ?? { id: b.supplierId, name: b.supplier.name, total: new Decimal(0), count: 0 };
     existing.total = existing.total.plus(new Decimal(b.amount.toString()));
     existing.count += 1;
     byId.set(b.supplierId, existing);
@@ -64,7 +66,7 @@ export default async function ExpenseBySupplierPage({
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.name}>
-                <TableCell>{r.name}</TableCell>
+                <TableCell><DrillLink href={creditorHref(r.id, { from, to })}>{r.name}</DrillLink></TableCell>
                 <TableCell className="text-right tabular">{r.count}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.total)}</TableCell>
               </TableRow>

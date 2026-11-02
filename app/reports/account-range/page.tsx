@@ -12,6 +12,8 @@ import { DataCard } from "@/components/data-card";
 import { Empty } from "@/components/empty";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { glHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +104,7 @@ export default async function AccountRangePage({
               <TableRow key={r.account.id} className={r.account.active ? "" : "opacity-60"}>
                 <TableCell className="font-mono">{r.account.code}</TableCell>
                 <TableCell>
-                  {r.account.name}
+                  <DrillLink href={glHref(r.account.id, { to })}>{r.account.name}</DrillLink>
                   {!r.account.active && <Badge variant="outline" className="ml-2">Inactive</Badge>}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{r.account.group}</TableCell>

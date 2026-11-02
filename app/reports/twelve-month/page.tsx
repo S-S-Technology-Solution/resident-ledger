@@ -8,6 +8,25 @@ import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+
+// The report that lists what makes up each line for a month (or the year).
+const DETAIL: Record<(typeof TWELVE_MONTH_ROWS)[number]["key"], string> = {
+  sales: "/reports/sales-report",
+  purchases: "/reports/expense-by-supplier",
+  receipt: "/reports/collection",
+  payment: "/reports/creditor-payments",
+  expenses: "/reports/expense-by-category",
+  cashBalance: "/reports/cash-book",
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+/** First and last day of month `m` (0-11) of `year`, or of the whole year. */
+function period(year: number, m?: number) {
+  if (m === undefined) return `from=${year}-01-01&to=${year}-12-31`;
+  const last = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
+  return `from=${year}-${pad(m + 1)}-01&to=${year}-${pad(m + 1)}-${last}`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -81,11 +100,11 @@ export default async function TwelveMonthPage({
                   </TableCell>
                   {values.map((v, i) => (
                     <TableCell key={i} className="text-right font-mono tabular whitespace-nowrap">
-                      {v.isZero() ? "" : fmtRM(v)}
+                      {v.isZero() ? "" : <DrillLink href={`${DETAIL[row.key]}?${period(year, i)}`}>{fmtRM(v)}</DrillLink>}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono tabular font-semibold whitespace-nowrap">
-                    {fmtRM(total)}
+                    <DrillLink href={`${DETAIL[row.key]}?${period(year)}`}>{fmtRM(total)}</DrillLink>
                   </TableCell>
                 </TableRow>
               );

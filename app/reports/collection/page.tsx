@@ -9,6 +9,8 @@ import { ExportButtons } from "@/components/export-buttons";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { requireReport } from "@/lib/screen-guard";
+import { DrillLink } from "@/components/drill-link";
+import { debtorHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,7 @@ export default async function CollectionReportPage({
   const rows = residents.map((r) => {
     const billed = r.charges.reduce((s, c) => s.plus(new Decimal(c.amount.toString())), new Decimal(0));
     const collected = r.receipts.reduce((s, p) => s.plus(new Decimal(p.amount.toString())), new Decimal(0));
-    return { unit: r.unitAddress, owner: r.ownerName, billed, collected, net: billed.minus(collected) };
+    return { id: r.id, unit: r.unitAddress, owner: r.ownerName, billed, collected, net: billed.minus(collected) };
   }).filter((r) => !r.billed.eq(0) || !r.collected.eq(0));
 
   const totals = rows.reduce(
@@ -74,7 +76,7 @@ export default async function CollectionReportPage({
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.unit}>
-                <TableCell>{r.unit}</TableCell>
+                <TableCell><DrillLink href={debtorHref(r.id, { from, to })}>{r.unit}</DrillLink></TableCell>
                 <TableCell className="text-muted-foreground">{r.owner}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.billed)}</TableCell>
                 <TableCell className="text-right font-mono tabular">{fmtRM(r.collected)}</TableCell>
