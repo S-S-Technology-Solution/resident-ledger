@@ -1,6 +1,8 @@
 import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { format } from "date-fns";
 import type { ReportData } from "./types";
 import { fmtAcct, type FinancialStatement } from "../financial-statements";
+import type { StatementAsAt } from "../resident-statement";
 
 const styles = StyleSheet.create({
   page: { padding: 28, fontSize: 9, fontFamily: "Helvetica", color: "#111827" },
@@ -196,7 +198,108 @@ function financialPdf(fs: FinancialStatement, title: string) {
   );
 }
 
+const soa = StyleSheet.create({
+  // The bottom padding keeps the rows clear of the block at the foot of the last page.
+  page: { paddingTop: 30, paddingBottom: 135, paddingHorizontal: 30, fontSize: 9, fontFamily: "Helvetica", color: "#000" },
+  name: { fontSize: 13, fontFamily: "Helvetica-Bold", textAlign: "center" },
+  centre: { textAlign: "center", marginTop: 2 },
+  party: { flexDirection: "row", justifyContent: "space-between", marginTop: 14 },
+  title: { fontSize: 13, fontFamily: "Helvetica-Bold" },
+  info: { flexDirection: "row", marginTop: 12, marginBottom: 4 },
+  infoCell: { width: 90, textAlign: "right" },
+  bold: { fontFamily: "Helvetica-Bold" },
+  head: { flexDirection: "row", borderTopWidth: 0.75, borderBottomWidth: 0.75, borderColor: "#000", paddingVertical: 3, fontFamily: "Helvetica-Bold" },
+  row: { flexDirection: "row", paddingVertical: 2.5 },
+  date: { width: 58 },
+  ref: { width: 74 },
+  description: { flex: 1, paddingRight: 6 },
+  money: { width: 72, textAlign: "right" },
+  detail: { fontFamily: "Helvetica-Oblique", marginTop: 1 },
+  foot: { position: "absolute", left: 30, right: 30, bottom: 26 },
+  closing: { textAlign: "right", paddingVertical: 3, marginTop: 4, borderTopWidth: 0.75, borderColor: "#000" },
+  box: { flexDirection: "row", borderWidth: 0.75, borderColor: "#000" },
+  boxCell: { flex: 1, borderRightWidth: 0.75, borderColor: "#000" },
+  boxLabel: { textAlign: "right", padding: 3, borderBottomWidth: 0.75, borderColor: "#000" },
+  boxAmount: { textAlign: "right", padding: 3 },
+});
+
+/** A resident's statement of account, as the accountant's print lays it out. */
+function statementOfAccountPdf(s: StatementAsAt, title: string) {
+  const cur = s.association.currency;
+  return (
+    <Document title={title} author="ResidentLedger">
+      <Page size="A4" style={soa.page} wrap>
+        <View fixed>
+          <Text style={soa.name}>{s.association.name}</Text>
+          {s.association.registrationNo && <Text style={soa.centre}>{s.association.registrationNo}</Text>}
+          {s.association.address && <Text style={soa.centre}>{s.association.address}</Text>}
+          <View style={soa.party}>
+            <View>
+              <Text style={soa.bold}>{s.resident.name}</Text>
+              <Text style={{ marginTop: 2 }}>{s.resident.unit}</Text>
+            </View>
+            <Text style={soa.title}>STATEMENT OF ACCOUNT</Text>
+          </View>
+          <View style={soa.info}>
+            <Text style={{ flex: 1, alignSelf: "flex-end" }}>{s.resident.code ?? ""}</Text>
+            <View style={soa.infoCell}><Text style={soa.bold}>MONTH</Text><Text style={{ marginTop: 2 }}>{s.month}</Text></View>
+            <View style={{ ...soa.infoCell, width: 50 }}>
+              <Text style={soa.bold}>PAGE</Text>
+              <Text style={{ marginTop: 2 }} render={({ pageNumber }) => String(pageNumber)} />
+            </View>
+            <View style={{ ...soa.infoCell, width: 70 }}><Text style={soa.bold}>DATE</Text><Text style={{ marginTop: 2 }}>{s.date}</Text></View>
+          </View>
+          <View style={soa.head}>
+            <Text style={soa.date}>DATE</Text>
+            <Text style={soa.ref}>REF NO.</Text>
+            <Text style={soa.description}>DESCRIPTION</Text>
+            <Text style={soa.money}>DEBIT {cur}</Text>
+            <Text style={soa.money}>CREDIT {cur}</Text>
+            <Text style={soa.money}>BALANCE {cur}</Text>
+          </View>
+        </View>
+        {s.rows.map((r, i) => (
+          <View key={i} style={soa.row} wrap={false}>
+            <Text style={soa.date}>{format(r.date, "dd/MM/yyyy")}</Text>
+            <Text style={soa.ref}>{r.refNo}</Text>
+            <View style={soa.description}>
+              <Text>{r.description}</Text>
+              {r.detail && <Text style={soa.detail}>{r.detail}</Text>}
+            </View>
+            <Text style={soa.money}>{r.debit.gt(0) ? formatMoney(r.debit.toNumber()) : ""}</Text>
+            <Text style={soa.money}>{r.credit.gt(0) ? formatMoney(r.credit.toNumber()) : ""}</Text>
+            <Text style={soa.money}>{formatMoney(r.balance.toNumber())}</Text>
+          </View>
+        ))}
+        {/* Only the last page carries the balance and ageing, at its foot. */}
+        <View
+          fixed
+          style={soa.foot}
+          // totalPages is passed at runtime; the View typings only list pageNumber.
+          render={(p) => p.pageNumber !== (p as typeof p & { totalPages: number }).totalPages ? null : (
+            <View>
+              <Text style={soa.bold}>RINGGIT M&apos;SIA : {s.words}</Text>
+              <Text style={[soa.closing, soa.bold]}>{formatMoney(s.closing.toNumber())}</Text>
+              <View style={soa.box}>
+                {s.ageing.map((a, i) => (
+                  <View key={a.label} style={i === s.ageing.length - 1 ? { flex: 1 } : soa.boxCell}>
+                    <Text style={soa.boxLabel}>{a.label}</Text>
+                    <Text style={soa.boxAmount}>{formatMoney(a.amount.toNumber())}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={{ marginTop: 5 }}>We shall be grateful if you will let us have payment as soon as possible.</Text>
+              <Text style={{ marginTop: 1 }}>Any discrepancy in this statement please inform us in writing within 10 days.</Text>
+            </View>
+          )}
+        />
+      </Page>
+    </Document>
+  );
+}
+
 export async function buildPdf(data: ReportData): Promise<Buffer> {
+  if (data.layout === "statement-of-account" && data.statementOfAccount) return renderToBuffer(statementOfAccountPdf(data.statementOfAccount, data.title));
   if (data.layout === "financial" && data.financial) return renderToBuffer(financialPdf(data.financial, data.title));
   if (data.layout === "statement") return renderToBuffer(statementPdf(data));
   const totalWeight = data.columns.reduce((s, c) => s + (c.width ?? 1), 0);

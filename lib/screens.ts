@@ -65,6 +65,7 @@ export const REPORTS: Report[] = [
   { key: "ar-ageing", group: "Receivables (AR)", href: "/reports/ar-ageing", title: "A/R Ageing Summary", description: "Outstanding resident balances bucketed by age." },
   { key: "collection", group: "Receivables (AR)", href: "/reports/collection", title: "Collection Report", description: "Billed vs collected per resident for a period." },
   { key: "payment-history", group: "Receivables (AR)", href: "/reports/payment-history", title: "Payment History (per Resident)", description: "All receipts and allocations for a single resident." },
+  { key: "statement-of-account", group: "Receivables (AR)", href: "/reports/statement-of-account", title: "Statement of Account", description: "One resident's account as at a date, with what is owed by month." },
   { key: "debtor-ledger", group: "Receivables (AR)", href: "/reports/debtor-ledger?kind=debtor", title: "Debtor / Creditor Ledger", description: "Every invoice and payment for one resident or supplier, with a running balance." },
   { key: "invoice-listing", group: "Receivables (AR)", href: "/reports/invoice-listing?view=unpaid", title: "Invoice Listing", description: "Unpaid, paid, and invoices falling due — switchable in one place." },
   { key: "sales-report", group: "Receivables (AR)", href: "/reports/sales-report", title: "Debtors Sales Report", description: "What was invoiced to each resident, and how much has been settled." },

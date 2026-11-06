@@ -6,6 +6,7 @@ import { auditDetail, cashBook, cashFlow, findTransactions, remittancePayments, 
 import {
   creditorLedger, debtorLedger, twelveMonthSummary, twelveMonthTotal, MONTHS, TWELVE_MONTH_ROWS, type LedgerRow,
 } from "../subsidiary-ledger";
+import { statementAsAt } from "../resident-statement";
 import type { ExportDef, ReportData } from "./types";
 import { base, numCol, parseRange, rangeSubtitle, ymd, type Range } from "./helpers";
 
@@ -257,6 +258,22 @@ export const MORE_REPORT_EXPORTS: Record<string, ExportDef> = {
   "check-transaction": {
     screen: "reports",
     build: (sp) => checkTransaction({ ...range(sp), q: opt(sp, "q"), amount: opt(sp, "amount"), status: opt(sp, "status") }),
+  },
+  "statement-of-account": {
+    screen: "reports",
+    build: async (sp) => {
+      const id = opt(sp, "id");
+      if (!id) throw new Error("id is required for statement-of-account");
+      const statement = await statementAsAt(id, opt(sp, "to"));
+      if (!statement) throw new Error("Resident not found");
+      return {
+        ...(await base()),
+        title: `Statement of Account ${statement.resident.code ?? statement.resident.unit}`,
+        columns: [], rows: [],
+        layout: "statement-of-account",
+        statementOfAccount: statement,
+      };
+    },
   },
   "debtor-ledger": {
     screen: "reports",

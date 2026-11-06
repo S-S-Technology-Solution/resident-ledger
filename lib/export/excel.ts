@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import type { ReportData } from "./types";
 import type { FinancialStatement } from "../financial-statements";
+import type { StatementAsAt } from "../resident-statement";
 
 /** The Million-style statement: centred heading, ruled account line, no column headings. */
 async function statementXlsx(data: ReportData): Promise<Buffer> {
@@ -91,7 +92,72 @@ async function financialXlsx(fs: FinancialStatement, title: string): Promise<Buf
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
+/** A resident's statement of account, as the accountant's print lays it out. */
+async function statementOfAccountXlsx(s: StatementAsAt, title: string): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "ResidentLedger";
+  const ws = wb.addWorksheet(title.replace(/[*?:\\/\[\]]/g, "-").slice(0, 31));
+  const numFmt = "#,##0.00;(#,##0.00)";
+  ws.columns = [{ width: 13 }, { width: 14 }, { width: 38 }, { width: 14 }, { width: 14 }, { width: 14 }];
+  const n = 6;
+  const centred = (text: string, bold = false, size = 11) => {
+    const row = ws.addRow([text]);
+    ws.mergeCells(row.number, 1, row.number, n);
+    row.getCell(1).alignment = { horizontal: "center" };
+    row.font = { bold, size };
+  };
+  const right = (cell: ExcelJS.Cell) => { cell.alignment = { horizontal: "right" }; };
+  centred(s.association.name, true, 14);
+  if (s.association.registrationNo) centred(s.association.registrationNo);
+  if (s.association.address) centred(s.association.address);
+  ws.addRow([]);
+  const party = ws.addRow([s.resident.name, "", "", "", "", "STATEMENT OF ACCOUNT"]);
+  party.font = { bold: true };
+  right(party.getCell(n));
+  ws.addRow([s.resident.unit]);
+  ws.addRow([]);
+  const infoHead = ws.addRow(["", "", "", "", "MONTH", "DATE"]);
+  infoHead.font = { bold: true };
+  const info = ws.addRow([s.resident.code ?? "", "", "", "", s.month, s.date]);
+  for (const row of [infoHead, info]) { right(row.getCell(5)); right(row.getCell(6)); }
+  const head = ws.addRow(["DATE", "REF NO.", "DESCRIPTION", `DEBIT ${s.association.currency}`, `CREDIT ${s.association.currency}`, `BALANCE ${s.association.currency}`]);
+  head.font = { bold: true };
+  for (let c = 1; c <= n; c++) head.getCell(c).border = { top: { style: "thin" }, bottom: { style: "thin" } };
+  for (const c of [4, 5, 6]) right(head.getCell(c));
+  for (const r of s.rows) {
+    const row = ws.addRow([
+      r.date.toISOString().slice(0, 10).split("-").reverse().join("/"), r.refNo, r.description,
+      r.debit.gt(0) ? r.debit.toNumber() : null, r.credit.gt(0) ? r.credit.toNumber() : null, r.balance.toNumber(),
+    ]);
+    for (const c of [4, 5, 6]) row.getCell(c).numFmt = numFmt;
+    if (r.detail) ws.addRow(["", "", r.detail]).getCell(3).font = { italic: true };
+  }
+  ws.addRow([]);
+  ws.addRow([`RINGGIT M'SIA : ${s.words}`]).font = { bold: true };
+  const closing = ws.addRow(["", "", "", "", "", s.closing.toNumber()]);
+  closing.font = { bold: true };
+  closing.getCell(n).numFmt = numFmt;
+  for (let c = 1; c <= n; c++) closing.getCell(c).border = { top: { style: "thin" } };
+  const boxed: Partial<ExcelJS.Borders> = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+  const labels = ws.addRow(s.ageing.map((a) => a.label));
+  const amounts = ws.addRow(s.ageing.map((a) => a.amount.toNumber()));
+  for (let c = 1; c <= n; c++) {
+    right(labels.getCell(c));
+    labels.getCell(c).border = boxed;
+    amounts.getCell(c).border = boxed;
+    amounts.getCell(c).numFmt = numFmt;
+  }
+  ws.addRow(["We shall be grateful if you will let us have payment as soon as possible."]);
+  ws.addRow(["Any discrepancy in this statement please inform us in writing within 10 days."]);
+  ws.pageSetup.orientation = "portrait";
+  ws.pageSetup.fitToPage = true;
+  ws.pageSetup.fitToWidth = 1;
+  ws.pageSetup.fitToHeight = 0;
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
 export async function buildXlsx(data: ReportData): Promise<Buffer> {
+  if (data.layout === "statement-of-account" && data.statementOfAccount) return statementOfAccountXlsx(data.statementOfAccount, data.title);
   if (data.layout === "financial" && data.financial) return financialXlsx(data.financial, data.title);
   if (data.layout === "statement") return statementXlsx(data);
   const wb = new ExcelJS.Workbook();
