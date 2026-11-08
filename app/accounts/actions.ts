@@ -11,7 +11,7 @@ import { attempt } from "@/lib/action-server";
 
 const upsertSchema = z.object({
   id: z.string().optional(),
-  code: z.string().min(1).max(20),
+  code: z.string().trim().min(1).max(20),
   name: z.string().min(1).max(120),
   type: z.enum(["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]),
   normalSide: z.enum(["DEBIT", "CREDIT"]),
@@ -25,15 +25,24 @@ export async function upsertAccount(input: UpsertAccountInput) {
   return attempt(async () => {
     await requireAdmin();
     const data = upsertSchema.parse(input);
-    const payload = {
-      name: data.name, code: data.code, type: data.type, normalSide: data.normalSide,
+    const details = {
+      name: data.name, type: data.type, normalSide: data.normalSide,
       group: data.group, classifiedAs: data.classifiedAs ?? null,
     };
     if (data.id) {
-      await db.account.update({ where: { id: data.id }, data: payload });
+      // The A/C No. is fixed once the account exists; only its details can change.
+      const account = await db.account.findUnique({ where: { id: data.id }, select: { code: true } });
+      if (!account) throw new Error("Account not found");
+      if (account.code !== data.code) throw new Error(`The A/C No. cannot be changed once the account is created. It stays ${account.code}.`);
+      await db.account.update({ where: { id: data.id }, data: details });
     } else {
+      const taken = await db.account.findUnique({
+        where: { associationId_code: { associationId: DEFAULT_ASSOCIATION_ID, code: data.code } },
+        select: { name: true },
+      });
+      if (taken) throw new Error(`A/C No. ${data.code} is already used by ${taken.name}.`);
       await db.account.create({
-        data: { associationId: DEFAULT_ASSOCIATION_ID, ...payload },
+        data: { associationId: DEFAULT_ASSOCIATION_ID, code: data.code, ...details },
       });
     }
     revalidatePath("/accounts");

@@ -80,7 +80,8 @@ export function AccountDialog({ mode, account }: { mode: "create" | "edit"; acco
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>A/C No.</Label>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. 90U3/0000" />
+              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. 90U3/0000" disabled={mode === "edit"} />
+              {mode === "edit" && <p className="text-xs text-muted-foreground">Cannot be changed once created.</p>}
             </div>
             <div className="space-y-1">
               <Label>A/C Type</Label>

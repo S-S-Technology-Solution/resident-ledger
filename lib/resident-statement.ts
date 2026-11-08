@@ -191,13 +191,22 @@ export async function statementAsAt(id: string, to?: string) {
     const column = columnOf(c.date);
     owed[column] = owed[column].plus(c.amount.toString()).minus(paid);
   }
-  // Money not yet set against a charge (paid in advance) comes off the latest month.
+  // Money not yet set against a charge clears the oldest debt first; whatever
+  // is left over was paid in advance and comes off the latest month.
+  let unapplied = new Decimal(0);
   for (const r of receipts) {
     const applied = r.allocations
       .filter((a) => !a.charge.voided && a.charge.date <= asAt)
       .reduce((s, a) => s.plus(a.amount.toString()), new Decimal(0));
-    owed[5] = owed[5].minus(r.amount.toString()).plus(applied);
+    unapplied = unapplied.plus(r.amount.toString()).minus(applied);
   }
+  for (let i = 0; i < owed.length && unapplied.gt(0); i++) {
+    if (owed[i].lte(0)) continue;
+    const cleared = Decimal.min(unapplied, owed[i]);
+    owed[i] = owed[i].minus(cleared);
+    unapplied = unapplied.minus(cleared);
+  }
+  owed[5] = owed[5].minus(unapplied);
 
   const label = (d: Date) => format(d, "MMM yyyy").toUpperCase();
   const ageing = [
