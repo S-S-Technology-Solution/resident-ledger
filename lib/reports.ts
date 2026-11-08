@@ -134,11 +134,43 @@ export async function trialBalanceRows(range: Range = {}): Promise<TrialBalanceR
     .filter((r) => !r.opening.eq(0) || !r.debit.eq(0) || !r.credit.eq(0) || !r.closing.eq(0));
 }
 
+/**
+ * The one-letter Type the view-ledger screen shows, from how the entry was
+ * posted: R receipt, P payment, S sales (charge), B supplier bill, C credit
+ * note, D debit note, J journal.
+ */
+export const LEDGER_TYPES: Record<string, string> = {
+  R: "Receipt", P: "Payment", S: "Charge", B: "Supplier bill", C: "Credit note", D: "Debit note", J: "Journal",
+};
+
+function ledgerType(source: string, cashDirection?: string): string {
+  switch (source) {
+    case "receipt": return "R";
+    case "charge": return "S";
+    case "bill": return "B";
+    case "creditnote": return "C";
+    case "debitnote":
+    case "supplierdebitnote": return "D";
+    case "refund":
+    case "billpayment": return "P";
+    case "cash": return cashDirection === "IN" ? "R" : "P";
+    default: return "J";
+  }
+}
+
 export type LedgerSection = {
   account: { id: string; code: string; name: string };
   /** Balance brought forward, debit-positive. */
   opening: Decimal;
-  rows: { entryId: string; date: Date; batch: string; ref: string; description: string; debit: Decimal; credit: Decimal; balance: Decimal }[];
+  rows: {
+    entryId: string; date: Date; batch: string; ref: string;
+    /** Entry description with the line's memo appended, as the printed ledger shows it. */
+    description: string;
+    /** The two halves the view-ledger screen shows separately. */
+    description1: string; description2: string;
+    type: string; chequeNo: string;
+    debit: Decimal; credit: Decimal; balance: Decimal;
+  }[];
   debit: Decimal;
   credit: Decimal;
   closing: Decimal;
@@ -167,10 +199,25 @@ export async function generalLedgerAll(range: Range & { accountId?: string } = {
         ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
       },
     },
-    include: { entry: { select: { date: true, entryNo: true, reference: true, description: true, batch: { select: { batchNo: true } } } } },
+    include: { entry: { select: { date: true, entryNo: true, reference: true, description: true, source: true, batch: { select: { batchNo: true } } } } },
     orderBy: [{ entry: { date: "asc" } }, { entry: { entryNo: "asc" } }, { lineNo: "asc" }],
   });
   const byAccount = Map.groupBy(lines, (l) => l.accountId);
+
+  // Cheque numbers live on the document each entry was posted from.
+  const entryIds = [...new Set(lines.map((l) => l.entryId))];
+  const where = { entryId: { in: entryIds } };
+  const [receipts, charges, payments, cash] = await Promise.all([
+    db.receipt.findMany({ where, select: { entryId: true, chequeNo: true } }),
+    db.charge.findMany({ where, select: { entryId: true, chequeNo: true } }),
+    db.billPayment.findMany({ where, select: { entryId: true, chequeNo: true } }),
+    db.cashEntry.findMany({ where, select: { entryId: true, chequeNo: true, direction: true } }),
+  ]);
+  const chequeOf = new Map<string, string>();
+  for (const d of [...receipts, ...charges, ...payments, ...cash]) {
+    if (d.entryId && d.chequeNo?.trim()) chequeOf.set(d.entryId, d.chequeNo.trim());
+  }
+  const cashDirection = new Map(cash.map((c) => [c.entryId, c.direction as string]));
 
   return accounts
     .map((account) => {
@@ -181,12 +228,18 @@ export async function generalLedgerAll(range: Range & { accountId?: string } = {
         const d = new Decimal(l.debit.toString()), c = new Decimal(l.credit.toString());
         running = running.plus(d).minus(c);
         debit = debit.plus(d); credit = credit.plus(c);
+        // A line memo that only repeats the entry's description adds nothing.
+        const memo = l.memo?.trim() && l.memo.trim() !== l.entry.description.trim() ? l.memo.trim() : "";
         return {
           entryId: l.entryId,
           date: l.entry.date,
           batch: l.entry.batch?.batchNo ?? "",
           ref: l.entry.reference ?? l.entry.entryNo,
-          description: l.memo ? `${l.entry.description} — ${l.memo}` : l.entry.description,
+          description: memo ? `${l.entry.description} — ${memo}` : l.entry.description,
+          description1: l.entry.description,
+          description2: memo,
+          type: ledgerType(l.entry.source, cashDirection.get(l.entryId)),
+          chequeNo: chequeOf.get(l.entryId) ?? "",
           debit: d, credit: c, balance: running,
         };
       });

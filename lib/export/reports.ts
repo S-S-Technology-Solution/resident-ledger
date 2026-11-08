@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { db } from "../db";
 import { DEFAULT_ASSOCIATION_ID } from "../association";
-import { generalLedgerAll, trialBalanceRows } from "../reports";
+import { generalLedgerAll, trialBalanceRows, LEDGER_TYPES, type LedgerSection } from "../reports";
 import { financialPosition, incomeStatement, type FinancialStatement } from "../financial-statements";
 import { ageingBucket } from "../ar";
 import type { ReportData } from "./types";
@@ -76,6 +76,7 @@ export async function balanceSheet(r: Range): Promise<ReportData> {
 export async function generalLedgerReport(accountId: string | undefined, r: Range): Promise<ReportData> {
   const range = parseRange(r);
   const sections = await generalLedgerAll({ ...range, accountId });
+  if (accountId && sections[0]) return viewLedger(sections[0], r);
   const sideText = (v: Decimal) => (v.eq(0) ? "0.00" : `${v.abs().toFixed(2)} ${v.gt(0) ? "Dr" : "Cr"}`);
   const rows: ReportData["rows"] = [];
   for (const s of sections) {
@@ -104,6 +105,40 @@ export async function generalLedgerReport(accountId: string | undefined, r: Rang
       { key: "balance", header: "Balance", align: "right", width: 1.6 },
     ],
     rows,
+  };
+}
+
+/** One account in the view-ledger layout, as the screen shows it. */
+async function viewLedger(s: LedgerSection, r: Range): Promise<ReportData> {
+  const rows: ReportData["rows"] = [];
+  if (!s.opening.eq(0)) {
+    rows.push({ date: "", type: "", ref: "", chequeNo: "", description: "Balance B/F", description2: "", debit: "", credit: "", balance: s.opening.toNumber() });
+  }
+  for (const l of s.rows) {
+    rows.push({
+      date: l.date.toISOString().slice(0, 10), type: l.type, ref: l.ref, chequeNo: l.chequeNo,
+      description: l.description1, description2: l.description2,
+      debit: l.debit.gt(0) ? l.debit.toNumber() : "", credit: l.credit.gt(0) ? l.credit.toNumber() : "", balance: l.balance.toNumber(),
+    });
+  }
+  const types = [...new Set(s.rows.map((l) => l.type))].sort();
+  return {
+    ...(await base()),
+    title: `${s.account.code} - ${s.account.name}`,
+    subtitle: `${rangeSubtitle(r)}${types.length ? ` · Type: ${types.map((t) => `${t} ${LEDGER_TYPES[t]}`).join(", ")}` : ""}`,
+    columns: [
+      { key: "date", header: "Date", width: 1.2 },
+      { key: "type", header: "Type", width: 0.6 },
+      { key: "ref", header: "Reference No.", width: 1.3 },
+      { key: "chequeNo", header: "Cheque No.", width: 1.2 },
+      { key: "description", header: "Description", width: 2.7 },
+      { key: "description2", header: "Description #2", width: 1.9 },
+      numCol("debit", "Debit", 1.3),
+      numCol("credit", "Credit", 1.3),
+      numCol("balance", "Balance", 1.3),
+    ],
+    rows,
+    totals: { date: "", type: "", ref: "", chequeNo: "", description: "", description2: "MYR", debit: s.debit.toNumber(), credit: s.credit.toNumber(), balance: s.closing.toNumber() },
   };
 }
 
