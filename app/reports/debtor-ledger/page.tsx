@@ -12,6 +12,7 @@ import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { PickTable } from "../_components/pick-table";
 
 export const dynamic = "force-dynamic";
 
@@ -76,40 +77,29 @@ export default async function SubsidiaryLedgerPage({
         </Link>
       </div>
 
-      <div className="rounded-xl border bg-card p-3 no-print">
-        <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
-          {kind === "debtor"
-            ? residents.map((r) => (
-                <Link
-                  key={r.id}
-                  href={`/reports/debtor-ledger?kind=debtor&id=${r.id}`}
-                  className={
-                    id === r.id
-                      ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs text-primary-foreground"
-                      : "rounded-full border px-3 py-1 text-xs text-muted-foreground hover:bg-accent"
-                  }
-                >
-                  {r.debtorCode ?? r.unitAddress}
-                </Link>
-              ))
-            : suppliers.map((s) => (
-                <Link
-                  key={s.id}
-                  href={`/reports/debtor-ledger?kind=creditor&id=${s.id}`}
-                  className={
-                    id === s.id
-                      ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs text-primary-foreground"
-                      : "rounded-full border px-3 py-1 text-xs text-muted-foreground hover:bg-accent"
-                  }
-                >
-                  {s.name}
-                </Link>
-              ))}
-          {(kind === "debtor" ? residents : suppliers).length === 0 && (
-            <span className="text-sm text-muted-foreground">Nothing to show yet.</span>
-          )}
-        </div>
-      </div>
+      {kind === "debtor" ? (
+        <PickTable
+          columns={["A/C No.", "Address", "Owner"]}
+          placeholder="Search by A/C No., address or name…"
+          selected={id}
+          rows={residents.map((r) => ({
+            id: r.id,
+            href: `/reports/debtor-ledger?${new URLSearchParams({ kind: "debtor", id: r.id, ...(from && { from }), ...(to && { to }) })}`,
+            cells: [r.debtorCode ?? "", r.unitAddress, r.ownerName],
+          }))}
+        />
+      ) : (
+        <PickTable
+          columns={["A/C No.", "Supplier"]}
+          placeholder="Search by A/C No. or supplier…"
+          selected={id}
+          rows={suppliers.map((s) => ({
+            id: s.id,
+            href: `/reports/debtor-ledger?${new URLSearchParams({ kind: "creditor", id: s.id, ...(from && { from }), ...(to && { to }) })}`,
+            cells: [s.creditorCode ?? "", s.name],
+          }))}
+        />
+      )}
 
       {!data ? (
         <DataCard>

@@ -110,7 +110,7 @@ export default async function AccountRangePage({
                 <TableCell className="text-muted-foreground">{r.account.group}</TableCell>
                 <TableCell className="text-muted-foreground">{r.account.type}</TableCell>
                 <TableCell className="text-muted-foreground">{r.account.normalSide === "DEBIT" ? "Dr" : "Cr"}</TableCell>
-                <TableCell className="text-right font-mono tabular">{fmtRM(r.balance)}</TableCell>
+                <TableCell className="text-right font-mono tabular"><DrillLink href={glHref(r.account.id, { to })}>{fmtRM(r.balance)}</DrillLink></TableCell>
               </TableRow>
             ))}
             {rows.length > 0 && (

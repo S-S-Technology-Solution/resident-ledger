@@ -65,7 +65,7 @@ export default async function CashFlowPage({
                 <TableCell className="font-mono text-muted-foreground">{r.code}</TableCell>
                 <TableCell><DrillLink href={glHref(r.id, period)}>{r.name}</DrillLink></TableCell>
                 <TableCell className="text-right font-mono tabular">
-                  {fmtRM(r.inflow.minus(r.outflow))}
+                  <DrillLink href={glHref(r.id, period)}>{fmtRM(r.inflow.minus(r.outflow))}</DrillLink>
                 </TableCell>
               </TableRow>
             ))}
@@ -87,7 +87,7 @@ export default async function CashFlowPage({
                 <TableCell className="font-mono text-muted-foreground">{r.code}</TableCell>
                 <TableCell><DrillLink href={glHref(r.id, period)}>{r.name}</DrillLink></TableCell>
                 <TableCell className="text-right font-mono tabular">
-                  ({fmtRM(r.outflow.minus(r.inflow))})
+                  <DrillLink href={glHref(r.id, period)}>({fmtRM(r.outflow.minus(r.inflow))})</DrillLink>
                 </TableCell>
               </TableRow>
             ))}

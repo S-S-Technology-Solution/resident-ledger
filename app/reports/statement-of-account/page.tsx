@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { format } from "date-fns";
 import { Users } from "lucide-react";
 import { db } from "@/lib/db";
@@ -13,6 +12,7 @@ import { DrillLink } from "@/components/drill-link";
 import { ExportButtons } from "@/components/export-buttons";
 import { DateRange } from "../_components/date-range";
 import { requireReport } from "@/lib/screen-guard";
+import { PickTable } from "../_components/pick-table";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ export default async function StatementOfAccountPage({
     db.resident.findMany({
       where: { associationId: DEFAULT_ASSOCIATION_ID },
       orderBy: { debtorCode: "asc" },
-      select: { id: true, debtorCode: true, unitAddress: true },
+      select: { id: true, debtorCode: true, unitAddress: true, ownerName: true },
     }),
     id ? statementAsAt(id, to) : null,
   ]);
@@ -54,23 +54,16 @@ export default async function StatementOfAccountPage({
             </>
           }
         />
-        <div className="rounded-xl border bg-card p-3">
-          <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
-            {residents.map((r) => (
-              <Link
-                key={r.id}
-                href={`/reports/statement-of-account?${new URLSearchParams({ id: r.id, ...(to && { to }) })}`}
-                className={
-                  id === r.id
-                    ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs text-primary-foreground"
-                    : "rounded-full border px-3 py-1 text-xs text-muted-foreground hover:bg-accent"
-                }
-              >
-                {r.debtorCode ?? r.unitAddress}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <PickTable
+          columns={["A/C No.", "Address", "Owner"]}
+          placeholder="Search by A/C No., address or name…"
+          selected={id}
+          rows={residents.map((r) => ({
+            id: r.id,
+            href: `/reports/statement-of-account?${new URLSearchParams({ id: r.id, ...(to && { to }) })}`,
+            cells: [r.debtorCode ?? "", r.unitAddress, r.ownerName],
+          }))}
+        />
       </div>
 
       {!s ? (

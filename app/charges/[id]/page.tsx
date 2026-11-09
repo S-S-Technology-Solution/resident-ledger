@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { db } from "@/lib/db";
@@ -6,7 +5,6 @@ import { getAssociation } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
 import { amountInWords } from "@/lib/receipts";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { PrintButton } from "@/app/receipts/[id]/print-button";
 import { requireScreen } from "@/lib/screen-guard";
 
@@ -54,7 +52,6 @@ export default async function InvoiceViewPage({ params }: { params: Promise<{ id
           )}
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline"><Link href="/charges">Back</Link></Button>
           <PrintButton />
         </div>
       </div>

@@ -72,7 +72,7 @@ export default async function ExpenseByCategoryPage({
               <TableRow key={r.code}>
                 <TableCell className="font-mono">{r.code}</TableCell>
                 <TableCell><DrillLink href={glHref(r.id, { from, to })}>{r.name}</DrillLink></TableCell>
-                <TableCell className="text-right font-mono tabular">{fmtRM(r.amount)}</TableCell>
+                <TableCell className="text-right font-mono tabular"><DrillLink href={glHref(r.id, { from, to })}>{fmtRM(r.amount)}</DrillLink></TableCell>
               </TableRow>
             ))}
           </TableBody>

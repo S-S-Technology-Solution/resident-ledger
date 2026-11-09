@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { getAssociation } from "@/lib/association";
 import { fmtRM } from "@/lib/money";
 import { amountInWords } from "@/lib/receipts";
 import { residentStatement } from "@/lib/resident-statement";
-import { Button } from "@/components/ui/button";
 import { ExportButtons } from "@/components/export-buttons";
 import { DateRange } from "@/app/reports/_components/date-range";
 import { requireScreen } from "@/lib/screen-guard";
@@ -51,7 +49,6 @@ export default async function StatementPage({
         </div>
         <div className="flex items-end gap-3">
           <DateRange mode="range" />
-          <Button asChild variant="outline"><Link href={`/residents/${id}`}>Back</Link></Button>
           <ExportButtons slug="resident-statement" params={{ residentId: id, from, to }} />
         </div>
       </div>

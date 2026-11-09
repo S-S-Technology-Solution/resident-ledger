@@ -13,6 +13,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
 import { DrillLink } from "@/components/drill-link";
 import { entryHref, glHref } from "@/lib/drill";
+import { PickTable } from "../_components/pick-table";
 
 export const dynamic = "force-dynamic";
 
@@ -77,26 +78,17 @@ export default async function BatchTransactionsPage({
         }
       />
 
-      <div className="rounded-xl border bg-card p-3 no-print">
-        <div className="flex flex-wrap gap-2">
-          {batches.map((b) => (
-            <Link
-              key={b.id}
-              href={`/reports/batch-transactions?batch=${b.batchNo}${detail ? "" : "&view=summary"}`}
-              className={
-                batchNo === b.batchNo
-                  ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs text-primary-foreground"
-                  : "rounded-full border px-3 py-1 text-xs text-muted-foreground hover:bg-accent"
-              }
-            >
-              {b.batchNo}
-            </Link>
-          ))}
-          {batches.length === 0 && (
-            <span className="text-sm text-muted-foreground">No batches yet.</span>
-          )}
-        </div>
-      </div>
+      <PickTable
+        columns={["Batch", "Description"]}
+        placeholder="Search by batch or description…"
+        empty="No batches yet."
+        selected={batch?.id}
+        rows={batches.map((b) => ({
+          id: b.id,
+          href: `/reports/batch-transactions?batch=${b.batchNo}${detail ? "" : "&view=summary"}`,
+          cells: [b.batchNo, b.description],
+        }))}
+      />
 
       {!batch ? (
         <DataCard>

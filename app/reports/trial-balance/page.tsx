@@ -85,8 +85,8 @@ export default async function TrialBalancePage({
                 <TableRow key={r.id}>
                   <TableCell className="font-mono">{r.code}</TableCell>
                   <TableCell><DrillLink href={glHref(r.id, { to })}>{r.name}</DrillLink></TableCell>
-                  <TableCell className="text-right font-mono tabular">{r.closing.gt(0) ? fmtRM(r.closing) : ""}</TableCell>
-                  <TableCell className="text-right font-mono tabular">{r.closing.lt(0) ? fmtRM(r.closing.neg()) : ""}</TableCell>
+                  <TableCell className="text-right font-mono tabular">{r.closing.gt(0) && <DrillLink href={glHref(r.id, { to })}>{fmtRM(r.closing)}</DrillLink>}</TableCell>
+                  <TableCell className="text-right font-mono tabular">{r.closing.lt(0) && <DrillLink href={glHref(r.id, { to })}>{fmtRM(r.closing.neg())}</DrillLink>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -116,9 +116,9 @@ export default async function TrialBalancePage({
                   <TableCell className="font-mono">{r.code}</TableCell>
                   <TableCell className="whitespace-normal"><DrillLink href={glHref(r.id, { from, to })}>{r.name}</DrillLink></TableCell>
                   <TableCell className="text-right font-mono tabular">{side(r.opening)}</TableCell>
-                  <TableCell className="text-right font-mono tabular">{r.debit.gt(0) ? fmtRM(r.debit) : ""}</TableCell>
-                  <TableCell className="text-right font-mono tabular">{r.credit.gt(0) ? fmtRM(r.credit) : ""}</TableCell>
-                  <TableCell className="text-right font-mono tabular">{side(r.closing)}</TableCell>
+                  <TableCell className="text-right font-mono tabular">{r.debit.gt(0) && <DrillLink href={glHref(r.id, { from, to })}>{fmtRM(r.debit)}</DrillLink>}</TableCell>
+                  <TableCell className="text-right font-mono tabular">{r.credit.gt(0) && <DrillLink href={glHref(r.id, { from, to })}>{fmtRM(r.credit)}</DrillLink>}</TableCell>
+                  <TableCell className="text-right font-mono tabular"><DrillLink href={glHref(r.id, { from, to })}>{side(r.closing)}</DrillLink></TableCell>
                 </TableRow>
               ))}
             </TableBody>

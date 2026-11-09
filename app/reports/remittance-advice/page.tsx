@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { format } from "date-fns";
 import { Truck } from "lucide-react";
 import { db } from "@/lib/db";
@@ -15,6 +14,7 @@ import { DateRange } from "../_components/date-range";
 import { requireReport } from "@/lib/screen-guard";
 import { DrillLink } from "@/components/drill-link";
 import { entryHref } from "@/lib/drill";
+import { PickTable } from "../_components/pick-table";
 
 export const dynamic = "force-dynamic";
 
@@ -58,26 +58,17 @@ export default async function RemittanceAdvicePage({
         }
       />
 
-      <div className="rounded-xl border bg-card p-3 no-print">
-        <div className="flex flex-wrap gap-2">
-          {suppliers.map((s) => (
-            <Link
-              key={s.id}
-              href={`/reports/remittance-advice?supplierId=${s.id}`}
-              className={
-                supplierId === s.id
-                  ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs text-primary-foreground"
-                  : "rounded-full border px-3 py-1 text-xs text-muted-foreground hover:bg-accent"
-              }
-            >
-              {s.name}
-            </Link>
-          ))}
-          {suppliers.length === 0 && (
-            <span className="text-sm text-muted-foreground">No suppliers yet.</span>
-          )}
-        </div>
-      </div>
+      <PickTable
+        columns={["A/C No.", "Supplier"]}
+        placeholder="Search by A/C No. or supplier…"
+        empty="No suppliers yet."
+        selected={supplierId}
+        rows={suppliers.map((s) => ({
+          id: s.id,
+          href: `/reports/remittance-advice?${new URLSearchParams({ supplierId: s.id, ...(from && { from }), ...(to && { to }) })}`,
+          cells: [s.creditorCode ?? "", s.name],
+        }))}
+      />
 
       {!supplier ? (
         <DataCard>
