@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { canPost, getCurrentUser } from "./permissions";
-import { canSeeReport, canSeeScreen, homeFor, type ScreenKey } from "./screens";
+import { canOpenReport, canSeeScreen, homeFor, type ScreenKey } from "./screens";
 
 /** The signed-in user, read once per request however many components ask. */
 export const currentUser = cache(getCurrentUser);
@@ -21,10 +21,15 @@ export async function requireScreen(key: ScreenKey) {
   redirect(`/no-access?screen=${key}`);
 }
 
-/** Called at the top of each report: the Reports screen, and this report if particular ones are ticked. */
-export async function requireReport(key: string) {
+/**
+ * Called at the top of each report: the Reports screen, and this report if
+ * particular ones are ticked. `record` is the account, resident or supplier
+ * shown, for a report that can also be reached by clicking through (see
+ * DRILLS_INTO).
+ */
+export async function requireReport(key: string, record?: string | null) {
   const user = await requireScreen("reports");
-  if (!canSeeReport(user, key)) redirect("/reports");
+  if (!canOpenReport(user, key, record)) redirect("/reports");
   return user;
 }
 

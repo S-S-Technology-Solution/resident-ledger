@@ -12,6 +12,7 @@ import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { canSeeReport, canSeeScreen, screenForPath } from "@/lib/screens";
 import { PickTable } from "../_components/pick-table";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,15 @@ export default async function SubsidiaryLedgerPage({
 }: {
   searchParams: Promise<{ kind?: string; id?: string; from?: string; to?: string }>;
 }) {
-  await requireReport("debtor-ledger");
   const { kind: rawKind, id, from, to } = await searchParams;
+  const user = await requireReport("debtor-ledger", id);
+  // Reached by clicking a name, without the report on their list: just this account.
+  const full = canSeeReport(user, "debtor-ledger");
+  // A charge or receipt links to its own screen, for those who may open it.
+  const opens = (href: string) => {
+    const screen = screenForPath(href);
+    return !!screen && canSeeScreen(user, screen);
+  };
   const kind = rawKind === "creditor" ? "creditor" : "debtor";
   const range = { from: from ? new Date(from) : undefined, to: to ? new Date(to) : undefined };
 
@@ -62,43 +70,47 @@ export default async function SubsidiaryLedgerPage({
         }
       />
 
-      <div className="flex gap-1 border-b no-print">
-        <Link
-          href="/reports/debtor-ledger?kind=debtor"
-          className={kind === "debtor" ? "border-b-2 border-primary px-4 py-2 text-sm font-medium" : "px-4 py-2 text-sm text-muted-foreground hover:text-foreground"}
-        >
-          Debtors
-        </Link>
-        <Link
-          href="/reports/debtor-ledger?kind=creditor"
-          className={kind === "creditor" ? "border-b-2 border-primary px-4 py-2 text-sm font-medium" : "px-4 py-2 text-sm text-muted-foreground hover:text-foreground"}
-        >
-          Creditors
-        </Link>
-      </div>
+      {full && (
+        <>
+          <div className="flex gap-1 border-b no-print">
+            <Link
+              href="/reports/debtor-ledger?kind=debtor"
+              className={kind === "debtor" ? "border-b-2 border-primary px-4 py-2 text-sm font-medium" : "px-4 py-2 text-sm text-muted-foreground hover:text-foreground"}
+            >
+              Debtors
+            </Link>
+            <Link
+              href="/reports/debtor-ledger?kind=creditor"
+              className={kind === "creditor" ? "border-b-2 border-primary px-4 py-2 text-sm font-medium" : "px-4 py-2 text-sm text-muted-foreground hover:text-foreground"}
+            >
+              Creditors
+            </Link>
+          </div>
 
-      {kind === "debtor" ? (
-        <PickTable
-          columns={["A/C No.", "Address", "Owner"]}
-          placeholder="Search by A/C No., address or name…"
-          selected={id}
-          rows={residents.map((r) => ({
-            id: r.id,
-            href: `/reports/debtor-ledger?${new URLSearchParams({ kind: "debtor", id: r.id, ...(from && { from }), ...(to && { to }) })}`,
-            cells: [r.debtorCode ?? "", r.unitAddress, r.ownerName],
-          }))}
-        />
-      ) : (
-        <PickTable
-          columns={["A/C No.", "Supplier"]}
-          placeholder="Search by A/C No. or supplier…"
-          selected={id}
-          rows={suppliers.map((s) => ({
-            id: s.id,
-            href: `/reports/debtor-ledger?${new URLSearchParams({ kind: "creditor", id: s.id, ...(from && { from }), ...(to && { to }) })}`,
-            cells: [s.creditorCode ?? "", s.name],
-          }))}
-        />
+          {kind === "debtor" ? (
+            <PickTable
+              columns={["A/C No.", "Address", "Owner"]}
+              placeholder="Search by A/C No., address or name…"
+              selected={id}
+              rows={residents.map((r) => ({
+                id: r.id,
+                href: `/reports/debtor-ledger?${new URLSearchParams({ kind: "debtor", id: r.id, ...(from && { from }), ...(to && { to }) })}`,
+                cells: [r.debtorCode ?? "", r.unitAddress, r.ownerName],
+              }))}
+            />
+          ) : (
+            <PickTable
+              columns={["A/C No.", "Supplier"]}
+              placeholder="Search by A/C No. or supplier…"
+              selected={id}
+              rows={suppliers.map((s) => ({
+                id: s.id,
+                href: `/reports/debtor-ledger?${new URLSearchParams({ kind: "creditor", id: s.id, ...(from && { from }), ...(to && { to }) })}`,
+                cells: [s.creditorCode ?? "", s.name],
+              }))}
+            />
+          )}
+        </>
       )}
 
       {!data ? (
@@ -137,7 +149,7 @@ export default async function SubsidiaryLedgerPage({
                 <TableRow key={i}>
                   <TableCell>{format(r.date, "dd MMM yyyy")}</TableCell>
                   <TableCell className="font-mono">
-                    {r.href ? <Link href={r.href} className="hover:underline">{r.ref}</Link> : r.ref}
+                    {r.href && opens(r.href) ? <Link href={r.href} className="hover:underline">{r.ref}</Link> : r.ref}
                   </TableCell>
                   <TableCell>{r.description}</TableCell>
                   <TableCell className="text-right font-mono tabular">

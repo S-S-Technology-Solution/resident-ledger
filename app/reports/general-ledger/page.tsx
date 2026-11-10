@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import Decimal from "decimal.js";
 import { BookOpen } from "lucide-react";
 import { requireReport } from "@/lib/screen-guard";
+import { canSeeReport } from "@/lib/screens";
 import { DrillLink } from "@/components/drill-link";
 import { entryHref } from "@/lib/drill";
 
@@ -26,8 +27,10 @@ export default async function GLPage({
 }: {
   searchParams: Promise<{ accountId?: string; from?: string; to?: string }>;
 }) {
-  await requireReport("general-ledger");
   const sp = await searchParams;
+  const user = await requireReport("general-ledger", sp.accountId);
+  // Reached by clicking a figure, without the report on their list: just this account.
+  const full = canSeeReport(user, "general-ledger");
   const association = await getAssociation();
   const to = sp.to || new Date().toISOString().slice(0, 10);
   // Default period: from the start of the financial year to the "to" date.
@@ -53,9 +56,11 @@ export default async function GLPage({
           </>
         }
       />
-      <div className="rounded-xl border bg-card p-3 no-print">
-        <AccountPicker accounts={accounts} selected={sp.accountId} />
-      </div>
+      {full && (
+        <div className="rounded-xl border bg-card p-3 no-print">
+          <AccountPicker accounts={accounts} selected={sp.accountId} />
+        </div>
+      )}
 
       {sections.length === 0 && (
         <DataCard><Empty icon={BookOpen} title="Nothing in this period" description="No account has a balance or entries for these dates." /></DataCard>

@@ -3,7 +3,7 @@ import { buildXlsx } from "@/lib/export/excel";
 import { buildPdf } from "@/lib/export/pdf";
 import { EXPORTS } from "@/lib/export/registry";
 import { getCurrentUser } from "@/lib/permissions";
-import { canSeeReport, canSeeScreen } from "@/lib/screens";
+import { canOpenReport, canSeeScreen } from "@/lib/screens";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +12,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const def = EXPORTS[slug];
   if (!def) return NextResponse.json({ error: `Unknown export ${slug}` }, { status: 404 });
   // Each export belongs to a screen; you can download it if you can open that
-  // screen (for a report, that report).
+  // screen (for a report, that report, or the one record you clicked through to).
   const user = await getCurrentUser();
-  const allowed = user && user.active && (def.screen === "reports" ? canSeeReport(user, slug) : canSeeScreen(user, def.screen));
+  const sp = req.nextUrl.searchParams;
+  const record = sp.get("accountId") ?? sp.get("id");
+  const allowed = user && user.active && (def.screen === "reports" ? canOpenReport(user, slug, record) : canSeeScreen(user, def.screen));
   if (!allowed) {
     return NextResponse.json({ error: "You don't have access to this screen." }, { status: 403 });
   }
-  const sp = req.nextUrl.searchParams;
   const format = (sp.get("format") ?? "pdf").toLowerCase();
   try {
     const data = await def.build(sp);

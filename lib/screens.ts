@@ -90,6 +90,26 @@ export function canSeeReport(user: ScreenAccess, key: string) {
   return picked.length === 0 || picked.includes(reportScreen(key));
 }
 
+/**
+ * Reports a figure on another report opens for one account, resident or
+ * supplier (trial balance → that account's ledger). Someone who can see the
+ * report they clicked from may open that one record, even when the report
+ * itself isn't on their list.
+ */
+export const DRILLS_INTO: Record<string, string[]> = {
+  "general-ledger": [
+    "trial-balance", "profit-loss", "balance-sheet", "cash-flow", "account-range",
+    "fixed-assets", "expense-by-category", "batch-transactions",
+  ],
+  "debtor-ledger": ["ar-ageing", "collection", "ap-ageing", "creditor-payments", "expense-by-supplier"],
+};
+
+/** A report on the user's list, or one record of it reached by clicking through (`record` is its id). */
+export function canOpenReport(user: ScreenAccess, key: string, record?: string | null) {
+  if (canSeeReport(user, key)) return true;
+  return !!record && (DRILLS_INTO[key] ?? []).some((k) => canSeeReport(user, k));
+}
+
 /** The screen a path belongs to; the most specific prefix wins (/settings/users before /settings). */
 export function screenForPath(pathname: string): ScreenKey | null {
   if (pathname === "/") return "dashboard";
