@@ -17,7 +17,12 @@ export default async function NewBillPage() {
       select: { id: true, name: true },
     }),
     db.account.findMany({
-      where: { associationId: DEFAULT_ASSOCIATION_ID, active: true, type: "EXPENSE" },
+      // Expenses, and fixed-asset cost accounts for something bought to keep
+      // (not their accumulated depreciation).
+      where: {
+        associationId: DEFAULT_ASSOCIATION_ID, active: true,
+        OR: [{ type: "EXPENSE" }, { type: "ASSET", classifiedAs: "FA" }],
+      },
       orderBy: { code: "asc" },
       select: { id: true, code: true, name: true },
     }),

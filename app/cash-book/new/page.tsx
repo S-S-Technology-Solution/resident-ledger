@@ -13,7 +13,11 @@ export default async function NewCashEntryPage({ searchParams }: { searchParams:
   await requireWrite("cash-book", "/cash-book");
   const direction = (await searchParams).direction === "IN" ? "IN" : "OUT";
   const accounts = await db.account.findMany({
-    where: { associationId: DEFAULT_ASSOCIATION_ID, active: true, type: direction === "IN" ? "INCOME" : "EXPENSE" },
+    // A payment may also buy a fixed asset (its cost account, not accumulated depreciation).
+    where: {
+      associationId: DEFAULT_ASSOCIATION_ID, active: true,
+      ...(direction === "IN" ? { type: "INCOME" as const } : { OR: [{ type: "EXPENSE" as const }, { type: "ASSET" as const, classifiedAs: "FA" }] }),
+    },
     orderBy: { code: "asc" },
     select: { id: true, code: true, name: true },
   });
