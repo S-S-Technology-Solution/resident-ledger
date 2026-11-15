@@ -40,6 +40,7 @@ export function JournalEditor({
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState(initial?.description ?? "");
   const [reference, setReference] = useState(initial?.reference ?? "");
+  const [entryNo, setEntryNo] = useState(initial?.entryNo ?? "");
   const [lines, setLines] = useState<Line[]>(initial?.lines ?? [emptyLine(), emptyLine()]);
   const readOnly = initial?.status && initial.status !== "DRAFT";
 
@@ -60,6 +61,7 @@ export function JournalEditor({
       try {
         const { id } = await unwrap(saveDraft({
           id: initial?.id,
+          entryNo: entryNo || undefined,
           date,
           description,
           reference: reference || undefined,
@@ -88,6 +90,11 @@ export function JournalEditor({
         <div className="space-y-1 md:col-span-2">
           <Label>Description</Label>
           <Input value={description} disabled={!!readOnly} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>Voucher no.</Label>
+          <Input value={entryNo} disabled={!!readOnly} placeholder="Leave blank to number it, e.g. JV260103"
+            onChange={(e) => setEntryNo(e.target.value)} />
         </div>
         <div className="space-y-1">
           <Label>Reference (optional)</Label>

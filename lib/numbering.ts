@@ -15,7 +15,7 @@ export { SEQUENCE_RESETS, stemFor, type SequenceConfig, type SequenceReset };
 
 export type SequenceKey =
   | "INVOICE" | "RECEIPT" | "JOURNAL" | "CASH_IN" | "CASH_OUT"
-  | "DEBIT_NOTE" | "CREDIT_NOTE" | "SUPPLIER_DN" | "SALES_JOURNAL";
+  | "DEBIT_NOTE" | "CREDIT_NOTE" | "SUPPLIER_DN" | "SALES_JOURNAL" | "JOURNAL_VOUCHER";
 
 export const SEQUENCE_DEFAULTS: Record<SequenceKey, SequenceConfig> = {
   INVOICE: { prefix: "", padding: 3, reset: "MONTHLY", startAt: 1 },
@@ -27,6 +27,8 @@ export const SEQUENCE_DEFAULTS: Record<SequenceKey, SequenceConfig> = {
   CREDIT_NOTE: { prefix: "CN-", padding: 2, reset: "MONTHLY", startAt: 1 },
   SUPPLIER_DN: { prefix: "SDN-", padding: 2, reset: "MONTHLY", startAt: 1 },
   SALES_JOURNAL: { prefix: "SJ-", padding: 5, reset: "YEARLY", startAt: 1 },
+  // As on the accountant's voucher: JV260103 is January 2026's third.
+  JOURNAL_VOUCHER: { prefix: "JV", padding: 2, reset: "MONTHLY", startAt: 1 },
 };
 
 function toConfig(row: { prefix: string; padding: number; reset: string; startAt: number }): SequenceConfig {
@@ -37,13 +39,14 @@ function toConfig(row: { prefix: string; padding: number; reset: string; startAt
 export const SEQUENCE_LABEL: Record<SequenceKey, string> = {
   INVOICE: "Sales invoice",
   RECEIPT: "Official receipt",
-  JOURNAL: "Journal entry (general)",
+  JOURNAL: "Journal entry (posted by the system)",
   CASH_IN: "Cash book receipt",
   CASH_OUT: "Payment voucher",
   DEBIT_NOTE: "Debit note (resident)",
   CREDIT_NOTE: "Credit note (resident)",
   SUPPLIER_DN: "Debit note (supplier)",
   SALES_JOURNAL: "Sales journal (fees, notes)",
+  JOURNAL_VOUCHER: "Journal voucher (keyed in Journal)",
 };
 
 export const SEQUENCE_KEYS = Object.keys(SEQUENCE_DEFAULTS) as SequenceKey[];
@@ -97,6 +100,7 @@ const NUMBERED: Record<SequenceKey, Source[]> = {
   CREDIT_NOTE: [own("Receipt", "receiptNo")],
   SUPPLIER_DN: [viaBill("voucherNo")],
   SALES_JOURNAL: [own("JournalEntry", "entryNo")],
+  JOURNAL_VOUCHER: [own("JournalEntry", "entryNo")],
 };
 
 /** Whether a number (e.g. one written in a voucher book) is already used for this document type. */

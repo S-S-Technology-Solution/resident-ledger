@@ -12,6 +12,7 @@ import { requirePosting } from "@/lib/permissions";
 import { attempt } from "@/lib/action-server";
 import { controlAccount } from "@/lib/control-accounts";
 import { RESIDENT_PICK, postResidentLines, voidResidentLines } from "@/lib/journal-residents";
+import { SOURCE_LABEL } from "@/lib/entry-source";
 
 const lineSchema = z.object({
   // An account, or a resident's debtor account as RESIDENT_PICK + resident id.
@@ -23,6 +24,8 @@ const lineSchema = z.object({
 
 const entrySchema = z.object({
   id: z.string().optional(),
+  // The voucher number, e.g. JV260103 as written on the voucher; blank numbers it automatically.
+  entryNo: z.string().optional(),
   date: z.string().min(1),
   description: z.string().min(1),
   reference: z.string().optional(),
@@ -68,11 +71,23 @@ async function toStoredLines(lines: ReturnType<typeof validateLines>) {
   });
 }
 
+/** A voucher number as typed, if it is free: JV 260103 → JV260103. */
+async function typedVoucherNo(typed: string | undefined, exceptId?: string) {
+  const no = typed?.replace(/\s+/g, "").toUpperCase();
+  if (!no) return null;
+  const taken = await db.journalEntry.findFirst({
+    where: { associationId: DEFAULT_ASSOCIATION_ID, entryNo: no, ...(exceptId ? { id: { not: exceptId } } : {}) },
+  });
+  if (taken) throw new Error(`${no} is already used by another journal entry.`);
+  return no;
+}
+
 export async function saveDraft(input: EntryInput) {
   return attempt(async () => {
     await requirePosting();
     const data = entrySchema.parse(input);
     const cleaned = await toStoredLines(validateLines(data.lines));
+    const typedNo = await typedVoucherNo(data.entryNo, data.id);
 
     if (data.id) {
       const existing = await db.journalEntry.findUnique({ where: { id: data.id } });
@@ -84,6 +99,7 @@ export async function saveDraft(input: EntryInput) {
         db.journalEntry.update({
           where: { id: data.id },
           data: {
+            ...(typedNo ? { entryNo: typedNo } : {}),
             date: new Date(data.date),
             description: data.description,
             reference: data.reference,
@@ -102,7 +118,7 @@ export async function saveDraft(input: EntryInput) {
     const created = await db.journalEntry.create({
       data: {
         associationId: DEFAULT_ASSOCIATION_ID,
-        entryNo,
+        entryNo: typedNo ?? entryNo,
         batchId,
         date: new Date(data.date),
         description: data.description,
@@ -147,6 +163,11 @@ export async function voidEntry(id: string, reason: string) {
     const entry = await db.journalEntry.findUnique({ where: { id }, include: { lines: true } });
     if (!entry) throw new Error("Not found");
     if (entry.status !== "POSTED") throw new Error("Only posted entries can be voided");
+    // An entry the system posted for a document goes with that document: voiding it
+    // here would take the payment or receipt out of the books while it still stands.
+    if (entry.source !== "manual") {
+      throw new Error(`This entry was posted from a ${(SOURCE_LABEL[entry.source] ?? entry.source).toLowerCase()}. Void that instead and its entry is reversed with it.`);
+    }
     const rev = await prepareEntry(new Date(), "reversal");
     await db.$transaction(async (tx) => {
       await tx.journalEntry.create({

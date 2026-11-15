@@ -7,7 +7,8 @@ import { NON_CASH_METHODS } from "./journal-residents";
  * PDF/Excel export both build their query here, so an export always holds the
  * rows the screen shows — all of them, not just the page on screen.
  */
-export type ListFilter = { q?: string; from?: string; to?: string; status?: string };
+// `keyed`: journal vouchers keyed in Journal only, not what documents posted.
+export type ListFilter = { q?: string; from?: string; to?: string; status?: string; keyed?: string };
 
 const dateRange = (from?: string, to?: string) =>
   from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {};
@@ -89,9 +90,10 @@ export const CASH_BOOK_ORDER = [{ date: "desc" }, { refNo: "desc" }] satisfies P
 
 export const JOURNAL_STATUSES = ["DRAFT", "POSTED", "VOIDED"] as const;
 
-export function journalWhere({ q, status, from, to }: ListFilter): Prisma.JournalEntryWhereInput {
+export function journalWhere({ q, status, from, to, keyed }: ListFilter): Prisma.JournalEntryWhereInput {
   return {
     associationId: DEFAULT_ASSOCIATION_ID,
+    ...(keyed ? { source: "manual" } : {}),
     ...(status ? { status: status as (typeof JOURNAL_STATUSES)[number] } : {}),
     ...dateRange(from, to),
     ...(q ? {

@@ -5,7 +5,8 @@ import Decimal from "decimal.js";
 import { db } from "@/lib/db";
 import { fmtRM } from "@/lib/money";
 import { glHref, entryHref } from "@/lib/drill";
-import { canSeeScreen, type ScreenKey } from "@/lib/screens";
+import { canSeeScreen } from "@/lib/screens";
+import { sourceDocument, SOURCE_LABEL } from "@/lib/entry-source";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,30 +16,6 @@ import { DrillLink } from "@/components/drill-link";
 import { requireScreen } from "@/lib/screen-guard";
 
 export const dynamic = "force-dynamic";
-
-/** The document an entry was posted from, and the screen it lives on. */
-function sourceDocument(e: { id: string; source: string; sourceId: string | null }): { label: string; href: string; screen: ScreenKey } | null {
-  const id = e.sourceId;
-  switch (e.source) {
-    case "receipt": return id ? { label: "Open the receipt", href: `/receipts/${id}`, screen: "receipts" } : null;
-    case "creditnote": return id ? { label: "Open the credit note", href: `/receipts/${id}`, screen: "receipts" } : null;
-    case "charge": return id ? { label: "Open the charge", href: `/charges/${id}`, screen: "charges" } : null;
-    case "debitnote": return id ? { label: "Open the debit note", href: `/charges/${id}`, screen: "charges" } : null;
-    case "refund": return id ? { label: "Open the refund", href: `/charges/${id}`, screen: "charges" } : null;
-    case "bill": return id ? { label: "Open the bill", href: `/bills/${id}`, screen: "bills" } : null;
-    case "billpayment":
-    case "supplierdebitnote": return { label: "Open the payment voucher", href: `/bills/voucher/${e.id}`, screen: "bills" };
-    case "cash": return id ? { label: "Open the cash book entry", href: `/cash-book/${id}`, screen: "cash-book" } : null;
-    case "manual": return { label: "Open in Journal", href: `/journal/${e.id}`, screen: "journal" };
-    default: return null;
-  }
-}
-
-const SOURCE_LABEL: Record<string, string> = {
-  receipt: "Official receipt", creditnote: "Credit note", charge: "Charge", debitnote: "Debit note",
-  refund: "Refund", bill: "Supplier bill", billpayment: "Payment voucher", supplierdebitnote: "Supplier debit note",
-  cash: "Cash book", manual: "Journal", opening: "Opening balance", yearend: "Year-end closing", reversal: "Reversal",
-};
 
 /** One posting in full, read-only: every account it touched, reached from a ledger line. */
 export default async function EntryPage({ params }: { params: Promise<{ id: string }> }) {

@@ -7,7 +7,7 @@ import Decimal from "decimal.js";
 export async function nextEntryNo(
   associationId = DEFAULT_ASSOCIATION_ID,
   date: Date = new Date(),
-  key: "JOURNAL" | "SALES_JOURNAL" = "JOURNAL",
+  key: "JOURNAL" | "SALES_JOURNAL" | "JOURNAL_VOUCHER" = "JOURNAL",
 ): Promise<string> {
   return nextNumber(key, date, associationId);
 }
@@ -26,8 +26,10 @@ export async function prepareEntry(
   const group = groupForSource(source);
   const batch = await ensureBatch(group, date, associationId);
   // Sales postings (fees, debit and credit notes) are numbered in their own
-  // sales journal, SJ-2026-00001, apart from the general journal's JE- numbers.
-  const entryNo = await nextEntryNo(associationId, date, group === "SALES" ? "SALES_JOURNAL" : "JOURNAL");
+  // sales journal, SJ-2026-00001, and vouchers keyed in Journal in theirs,
+  // JV260103, apart from the JE- numbers of everything else the system posts.
+  const entryNo = await nextEntryNo(associationId, date,
+    group === "SALES" ? "SALES_JOURNAL" : source === "manual" ? "JOURNAL_VOUCHER" : "JOURNAL");
   return { entryNo, batchId: batch.id };
 }
 

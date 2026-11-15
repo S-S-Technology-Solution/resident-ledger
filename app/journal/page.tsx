@@ -16,20 +16,21 @@ import { requireScreen } from "@/lib/screen-guard";
 import { Writable } from "@/components/writable";
 import { journalWhere, JOURNAL_ORDER, JOURNAL_STATUSES } from "@/lib/list-filters";
 import { ExportButtons } from "@/components/export-buttons";
+import { SOURCE_LABEL } from "@/lib/entry-source";
 
 export const dynamic = "force-dynamic";
 
 export default async function JournalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string; keyed?: string; page?: string }>;
 }) {
   await requireScreen("journal");
   const sp = await searchParams;
-  const { q, status, from, to } = sp;
+  const { q, status, from, to, keyed } = sp;
   const page = pageFrom(sp.page);
 
-  const where = journalWhere({ q, status, from, to });
+  const where = journalWhere({ q, status, from, to, keyed });
   const [entries, total] = await Promise.all([
     db.journalEntry.findMany({
       where,
@@ -48,7 +49,7 @@ export default async function JournalPage({
         description={`${total.toLocaleString()} ${total === 1 ? "entry" : "entries"}`}
         actions={
           <>
-            <ExportButtons slug="journal" params={{ q, status, from, to }} />
+            <ExportButtons slug="journal" params={{ q, status, from, to, keyed }} />
             <Writable><Button asChild><Link href="/journal/new">New Entry</Link></Button></Writable>
           </>
         }
@@ -68,18 +69,24 @@ export default async function JournalPage({
           <Input type="date" name="to" defaultValue={to ?? ""} />
         </div>
         {status && <input type="hidden" name="status" value={status} />}
+        {keyed && <input type="hidden" name="keyed" value={keyed} />}
         <Button type="submit" variant="outline">Apply</Button>
-        {(q || from || to || status) && (
+        {(q || from || to || status || keyed) && (
           <Button type="button" variant="ghost" asChild><Link href="/journal">Clear</Link></Button>
         )}
       </form>
 
       <nav className="flex items-center gap-1 text-sm border-b">
-        <Link href={`/journal${qs({ q, from, to })}`} className={cn("px-3 py-2 -mb-px border-b-2", !status ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>All</Link>
+        <Link href={`/journal${qs({ q, from, to, keyed })}`} className={cn("px-3 py-2 -mb-px border-b-2", !status ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>All</Link>
         {JOURNAL_STATUSES.map((s) => (
-          <Link key={s} href={`/journal${qs({ q, from, to, status: s })}`}
+          <Link key={s} href={`/journal${qs({ q, from, to, keyed, status: s })}`}
             className={cn("px-3 py-2 -mb-px border-b-2 uppercase text-xs tracking-wide", status === s ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>{s}</Link>
         ))}
+        {/* Only the vouchers keyed here, or also what receipts, vouchers and bills posted. */}
+        <Link href={`/journal${qs({ q, from, to, status, keyed: keyed ? undefined : "1" })}`}
+          className={cn("ml-auto mb-1 rounded-md border px-3 py-1 text-xs", keyed ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+          Journal vouchers only
+        </Link>
       </nav>
 
       <DataCard>
@@ -88,6 +95,7 @@ export default async function JournalPage({
             <TableRow>
               <TableHead>Entry #</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead className="text-right">Amount</TableHead>
@@ -102,6 +110,7 @@ export default async function JournalPage({
                 <TableRow key={e.id}>
                   <TableCell className="font-mono">{e.entryNo}</TableCell>
                   <TableCell>{format(e.date, "dd MMM yyyy")}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{SOURCE_LABEL[e.source] ?? e.source}</TableCell>
                   <TableCell className="font-medium">{e.description}</TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">{e.reference ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono tabular">{fmtRM(total)}</TableCell>
@@ -119,8 +128,8 @@ export default async function JournalPage({
         {entries.length === 0 && (
           <Empty
             icon={ScrollText}
-            title={q || status || from || to ? "No entries match" : "No journal entries"}
-            description={q || status || from || to ? "Adjust filters or clear them." : "Create your first entry, or one will be created automatically when you record a charge, receipt or bill."}
+            title={q || status || from || to || keyed ? "No entries match" : "No journal entries"}
+            description={q || status || from || to || keyed ? "Adjust filters or clear them." : "Create your first entry, or one will be created automatically when you record a charge, receipt or bill."}
             action={!q && !status && !from && !to && <Writable><Button asChild><Link href="/journal/new">New Entry</Link></Button></Writable>}
           />
         )}

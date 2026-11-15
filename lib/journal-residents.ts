@@ -61,7 +61,7 @@ export async function postResidentLines(
   })).map((r) => [r.id, r]));
 
   // Numbered after the voucher and the debtor account, e.g. JV260102/A11.
-  const base = entry.reference?.trim() || entry.entryNo;
+  const base = entry.entryNo;
   const taken = new Set<string>();
   const numberFor = async (residentId: string, inUse: (no: string) => Promise<boolean>) => {
     const code = residents.get(residentId)?.debtorCode?.split("/").pop() || residentId.slice(-6);

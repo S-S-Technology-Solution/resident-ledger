@@ -21,7 +21,7 @@ import { base, numCol, rangeSubtitle, ymd } from "./helpers";
  */
 const opt = (sp: URLSearchParams, k: string) => sp.get(k) || undefined;
 const filters = (sp: URLSearchParams): ListFilter => ({
-  q: opt(sp, "q"), from: opt(sp, "from"), to: opt(sp, "to"), status: opt(sp, "status"),
+  q: opt(sp, "q"), from: opt(sp, "from"), to: opt(sp, "to"), status: opt(sp, "status"), keyed: opt(sp, "keyed"),
 });
 const dec = (v: { toString(): string }) => new Decimal(v.toString());
 
