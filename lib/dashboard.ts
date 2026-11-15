@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { controlAccount } from "./control-accounts";
+import { NON_CASH_METHODS } from "./journal-residents";
 
 async function postedSum(accountId: string, range?: { from?: Date; to?: Date }) {
   const lines = await db.journalLine.findMany({
@@ -66,7 +67,7 @@ export async function dashboardStats() {
         .slice(0, 5),
     ),
     db.receipt.findMany({
-      where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false, method: { not: "CREDIT_NOTE" } },
+      where: { associationId: DEFAULT_ASSOCIATION_ID, voided: false, method: { notIn: NON_CASH_METHODS } },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       take: 5,
       include: { resident: true },

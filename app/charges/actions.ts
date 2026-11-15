@@ -50,6 +50,7 @@ export async function voidCharge(id: string, reason: string) {
     });
     if (!charge) throw new Error("Not found");
     if (charge.voided) throw new Error("Already voided");
+    if (charge.kind === "JOURNAL") throw new Error("This is a line on a journal voucher. Void the journal entry instead.");
     if (charge.kind === "REFUND") await releaseLineFor("refund", id);
     const allocated = charge.allocations
       .filter((a) => !a.receipt.voided)

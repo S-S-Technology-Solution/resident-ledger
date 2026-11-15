@@ -63,7 +63,9 @@ export async function residentStatement(id: string, { from, to }: { from?: strin
     ...allReceipts.filter((r) => r.date >= fromDate).map((r) => ({
       date: r.date,
       refNo: r.receiptNo,
-      description: `Payment received (${r.method === "BANK" ? "Bank Transfer" : "Cash"}${r.bankRef ? ` · ${r.bankRef}` : ""})`,
+      description: r.method === "CREDIT_NOTE" ? `Credit note — ${r.receivedFrom ?? ""}`
+        : r.method === "JOURNAL" ? `Journal voucher — ${r.receivedFrom ?? ""}`
+        : `Payment received (${r.method === "BANK" ? "Bank Transfer" : "Cash"}${r.bankRef ? ` · ${r.bankRef}` : ""})`,
       debit: new Decimal(0),
       credit: new Decimal(r.amount.toString()),
     })),
@@ -116,7 +118,7 @@ export type StatementAsAt = NonNullable<Awaited<ReturnType<typeof statementAsAt>
 
 /** Second line for a payment on the statement. */
 function paymentDetail(r: { method: string; bankRef: string | null; chequeNo: string | null; receivedFrom: string | null }) {
-  if (r.method === "CREDIT_NOTE") return r.receivedFrom;
+  if (r.method === "CREDIT_NOTE" || r.method === "JOURNAL") return r.receivedFrom;
   // As written on the receipt, e.g. "HLB 408032".
   const ref = r.chequeNo?.trim() || r.bankRef?.trim();
   if (ref) return ref;
@@ -163,7 +165,7 @@ export async function statementAsAt(id: string, to?: string) {
     ...receipts.map((r) => ({
       date: r.date,
       refNo: r.receiptNo,
-      description: r.isOpeningBalance ? "Balance brought forward (in credit)" : r.method === "CREDIT_NOTE" ? "Credit note" : "Payment received",
+      description: r.isOpeningBalance ? "Balance brought forward (in credit)" : r.method === "CREDIT_NOTE" ? "Credit note" : r.method === "JOURNAL" ? "Journal voucher" : "Payment received",
       detail: r.isOpeningBalance ? null : paymentDetail(r),
       debit: new Decimal(0),
       credit: new Decimal(r.amount.toString()),

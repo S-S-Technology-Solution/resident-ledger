@@ -11,6 +11,7 @@ import { Empty } from "@/components/empty";
 import { DateRange } from "../_components/date-range";
 import { ExportButtons } from "@/components/export-buttons";
 import { requireReport } from "@/lib/screen-guard";
+import { NOT_SALES_KINDS } from "@/lib/journal-residents";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function SalesReportPage({
   const charges = await db.charge.findMany({
     where: {
       associationId: DEFAULT_ASSOCIATION_ID,
-      voided: false, kind: { not: "REFUND" },
+      voided: false, kind: { notIn: NOT_SALES_KINDS },
       isOpeningBalance: false,
       ...(fromDate || toDate
         ? { date: { ...(fromDate && { gte: fromDate }), ...(toDate && { lte: toDate }) } }

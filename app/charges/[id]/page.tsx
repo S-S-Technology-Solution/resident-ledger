@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { format } from "date-fns";
 import { db } from "@/lib/db";
 import { getAssociation } from "@/lib/association";
@@ -21,6 +21,8 @@ export default async function InvoiceViewPage({ params }: { params: Promise<{ id
     include: { resident: true, allocations: { include: { receipt: true } } },
   });
   if (!charge) notFound();
+  // A journal voucher's debit to the resident is shown on the voucher.
+  if (charge.kind === "JOURNAL" && charge.entryId) redirect(`/journal/${charge.entryId}`);
   const association = await getAssociation();
   const amt = Number(charge.amount);
   const initials = association.name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).map((w) => w[0]).join("") || "R";

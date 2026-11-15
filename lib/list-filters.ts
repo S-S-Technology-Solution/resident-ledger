@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
+import { NON_CASH_METHODS } from "./journal-residents";
 
 /**
  * The search / date / status filters behind the list screens. The page and its
@@ -21,6 +22,8 @@ export function filterResidents<T extends { unitAddress: string; ownerName: stri
 export function chargeWhere({ q, from, to }: ListFilter): Prisma.ChargeWhereInput {
   return {
     associationId: DEFAULT_ASSOCIATION_ID,
+    // A journal voucher's debit to a resident is opened from the voucher.
+    kind: { not: "JOURNAL" },
     ...dateRange(from, to),
     ...(q ? {
       OR: [
@@ -33,11 +36,11 @@ export function chargeWhere({ q, from, to }: ListFilter): Prisma.ChargeWhereInpu
 }
 export const CHARGE_ORDER = [{ date: "desc" }, { createdAt: "desc" }] satisfies Prisma.ChargeOrderByWithRelationInput[];
 
-// Credit notes live with the resident's account, not the receipts list.
+// Credit notes and journal vouchers live with the resident's account, not the receipts list.
 export function receiptWhere({ q, from, to }: ListFilter): Prisma.ReceiptWhereInput {
   return {
     associationId: DEFAULT_ASSOCIATION_ID,
-    method: { not: "CREDIT_NOTE" },
+    method: { notIn: NON_CASH_METHODS },
     ...dateRange(from, to),
     ...(q ? {
       OR: [

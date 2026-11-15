@@ -38,6 +38,7 @@ export async function voidReceipt(id: string, reason: string) {
     const receipt = await db.receipt.findUnique({ where: { id } });
     if (!receipt) throw new Error("Not found");
     if (receipt.voided) throw new Error("Already voided");
+    if (receipt.method === "JOURNAL") throw new Error("This is a line on a journal voucher. Void the journal entry instead.");
     await releaseLineFor("receipt", id);
 
     await db.$transaction(async (tx) => {

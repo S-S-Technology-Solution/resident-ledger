@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
+import { journalAccountOptions } from "@/lib/journal-residents";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { JournalEditor } from "../journal-editor";
@@ -10,11 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewJournalPage() {
   await requireWrite("journal", "/journal");
-  const accounts = await db.account.findMany({
-    where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },
-    orderBy: { code: "asc" },
-    select: { id: true, code: true, name: true },
-  });
+  const accounts = await journalAccountOptions();
   return (
     <div className="space-y-6">
       <PageHeader

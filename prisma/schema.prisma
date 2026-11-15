@@ -233,9 +233,14 @@ model JournalLine {
   credit    Decimal      @default(0) @db.Decimal(15, 2)
   memo      String?
   lineNo    Int
+  // A line on a debtor account (e.g. 3000/A11) in a journal voucher: posted to
+  // the AR control account, and to this resident's account when the entry posts.
+  residentId String?
+  resident   Resident?    @relation(fields: [residentId], references: [id])
 
   @@index([accountId])
   @@index([entryId])
+  @@index([residentId])
 }
 
 model Resident {
@@ -254,6 +259,7 @@ model Resident {
 
   charges  Charge[]
   receipts Receipt[]
+  journalLines JournalLine[]
 
   @@unique([associationId, unitAddress])
   @@unique([associationId, debtorCode])
@@ -277,9 +283,10 @@ model Charge {
   // its own — the GL side comes from the single opening-balance entry, so posting
   // these individually would double-count prior-year income.
   isOpeningBalance Boolean  @default(false)
-  // FEE (monthly fee), DEBIT_NOTE (extra charge; credits creditAccountId), or
+  // FEE (monthly fee), DEBIT_NOTE (extra charge; credits creditAccountId),
   // REFUND (money paid back to the resident from creditAccountId, a bank or
-  // cash account, by voucher — it appears in bank reconciliation).
+  // cash account, by voucher — it appears in bank reconciliation), or JOURNAL
+  // (a debit to the resident's account in a journal voucher, entryId).
   kind          String      @default("FEE")
   creditAccountId String?
   method        String?
@@ -311,7 +318,8 @@ model Receipt {
   // the months the payment covers ("YYYY-MM"), and the cheque number if any.
   receivedFrom  String?
   // Credit notes (method CREDIT_NOTE) reduce what a resident owes without money
-  // changing hands; this is the account debited instead of the bank.
+  // changing hands; this is the account debited instead of the bank. A credit to
+  // the resident's account in a journal voucher (entryId) has method JOURNAL.
   contraAccountId String?
   periodFrom    String?
   periodTo      String?

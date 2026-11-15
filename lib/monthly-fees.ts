@@ -18,7 +18,7 @@ export async function generateMonthlyFees(
   });
   const already = new Set(
     (await db.charge.findMany({
-      where: { associationId, periodMonth, periodYear, voided: false },
+      where: { associationId, periodMonth, periodYear, voided: false, kind: "FEE" },
       select: { residentId: true },
     })).map((c) => c.residentId),
   );

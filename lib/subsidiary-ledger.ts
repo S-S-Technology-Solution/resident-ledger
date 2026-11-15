@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
+import { NON_CASH_METHODS, NOT_SALES_KINDS } from "./journal-residents";
 
 /**
  * Debtor and creditor ledgers — the subsidiary ledger for one resident or
@@ -44,15 +45,16 @@ export async function debtorLedger(residentId: string, range: Range = {}) {
       description: c.description,
       debit: new Decimal(c.amount.toString()),
       credit: new Decimal(0),
-      href: `/charges/${c.id}`,
+      href: c.kind === "JOURNAL" ? `/journal/${c.entryId}` : `/charges/${c.id}`,
     })),
     ...resident.receipts.map((r) => ({
       date: r.date,
       ref: r.receiptNo,
-      description: r.isOpeningBalance ? "Balance brought forward (in credit)" : `Receipt — ${r.method}`,
+      description: r.isOpeningBalance ? "Balance brought forward (in credit)"
+        : r.method === "JOURNAL" ? `Journal voucher — ${r.receivedFrom ?? ""}` : `Receipt — ${r.method}`,
       debit: new Decimal(0),
       credit: new Decimal(r.amount.toString()),
-      href: r.isOpeningBalance ? undefined : `/receipts/${r.id}`,
+      href: r.isOpeningBalance ? undefined : r.method === "JOURNAL" ? `/journal/${r.entryId}` : `/receipts/${r.id}`,
     })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime() || a.ref.localeCompare(b.ref));
 
@@ -149,11 +151,11 @@ export async function twelveMonthSummary(year: number, associationId = DEFAULT_A
 
   const [charges, receipts, bills, billPayments, cashEntries, accounts] = await Promise.all([
     db.charge.findMany({
-      where: { associationId, voided: false, isOpeningBalance: false, kind: { not: "REFUND" }, date: { gte: from, lte: to } },
+      where: { associationId, voided: false, isOpeningBalance: false, kind: { notIn: NOT_SALES_KINDS }, date: { gte: from, lte: to } },
       select: { date: true, amount: true },
     }),
     db.receipt.findMany({
-      where: { associationId, voided: false, isOpeningBalance: false, method: { not: "CREDIT_NOTE" }, date: { gte: from, lte: to } },
+      where: { associationId, voided: false, isOpeningBalance: false, method: { notIn: NON_CASH_METHODS }, date: { gte: from, lte: to } },
       select: { date: true, amount: true },
     }),
     db.bill.findMany({

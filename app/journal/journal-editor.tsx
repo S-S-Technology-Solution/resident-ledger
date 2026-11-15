@@ -115,7 +115,7 @@ export function JournalEditor({
                     value={l.accountId}
                     onChange={(v) => updateLine(i, { accountId: v })}
                     placeholder="Select account…"
-                    options={accounts.map((a) => ({ value: a.id, label: a.name, hint: a.code }))}
+                    options={accounts.map((a) => ({ value: a.id, label: `${a.code}  ${a.name}` }))}
                   />
                 </TableCell>
                 <TableCell>

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
+import { journalAccountOptions, RESIDENT_PICK } from "@/lib/journal-residents";
 import { Badge } from "@/components/ui/badge";
 import { JournalEditor } from "../journal-editor";
 import { format } from "date-fns";
@@ -20,11 +20,7 @@ export default async function ViewJournalPage({ params }: { params: Promise<{ id
   });
   if (!entry) notFound();
 
-  const accounts = await db.account.findMany({
-    where: { associationId: DEFAULT_ASSOCIATION_ID, active: true },
-    orderBy: { code: "asc" },
-    select: { id: true, code: true, name: true },
-  });
+  const accounts = await journalAccountOptions();
 
   return (
     <div className="space-y-6">
@@ -57,7 +53,7 @@ export default async function ViewJournalPage({ params }: { params: Promise<{ id
           reference: entry.reference,
           status: entry.status,
           lines: entry.lines.map((l) => ({
-            accountId: l.accountId,
+            accountId: l.residentId ? `${RESIDENT_PICK}${l.residentId}` : l.accountId,
             debit: l.debit.toString(),
             credit: l.credit.toString(),
             memo: l.memo ?? "",

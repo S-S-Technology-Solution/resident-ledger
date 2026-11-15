@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { format } from "date-fns";
 import { db } from "@/lib/db";
 import { getAssociation } from "@/lib/association";
@@ -21,6 +21,8 @@ export default async function ReceiptViewPage({ params }: { params: Promise<{ id
     include: { resident: true, allocations: { include: { charge: true } } },
   });
   if (!receipt) notFound();
+  // A journal voucher's credit to the resident is shown on the voucher.
+  if (receipt.method === "JOURNAL" && receipt.entryId) redirect(`/journal/${receipt.entryId}`);
   const association = await getAssociation();
   const amt = Number(receipt.amount);
   if (receipt.method === "CREDIT_NOTE") return <CreditNote receipt={receipt} associationName={association.name} />;

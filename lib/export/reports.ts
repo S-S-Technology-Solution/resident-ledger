@@ -7,6 +7,7 @@ import { ageingBucket } from "../ar";
 import type { ReportData } from "./types";
 
 import { base, numCol, parseRange, rangeSubtitle, type Range } from "./helpers";
+import { NON_CASH_METHODS, NOT_SALES_KINDS } from "../journal-residents";
 
 /** Year-to-date trial balance as at r.to, or b/f · movement · closing for r.from–r.to (view "movement"). */
 export async function trialBalance(r: Range & { view?: string }): Promise<ReportData> {
@@ -347,7 +348,7 @@ export async function paymentHistory(residentId: string, r: Range): Promise<Repo
   if (!resident) throw new Error("Resident not found");
   const receipts = await db.receipt.findMany({
     where: {
-      residentId, method: { not: "CREDIT_NOTE" },
+      residentId, method: { notIn: NON_CASH_METHODS },
       ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
     },
     orderBy: { date: "asc" },
@@ -587,7 +588,7 @@ export async function salesReport(r: Range): Promise<ReportData> {
   const range = parseRange(r);
   const charges = await db.charge.findMany({
     where: {
-      associationId: DEFAULT_ASSOCIATION_ID, voided: false, isOpeningBalance: false, kind: { not: "REFUND" },
+      associationId: DEFAULT_ASSOCIATION_ID, voided: false, isOpeningBalance: false, kind: { notIn: NOT_SALES_KINDS },
       ...(range.from || range.to ? { date: { ...(range.from && { gte: range.from }), ...(range.to && { lte: range.to }) } } : {}),
     },
     include: {

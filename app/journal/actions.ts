@@ -10,8 +10,11 @@ import { linesBalance, prepareEntry } from "@/lib/journal";
 import { assertPeriodOpen } from "@/lib/periods";
 import { requirePosting } from "@/lib/permissions";
 import { attempt } from "@/lib/action-server";
+import { controlAccount } from "@/lib/control-accounts";
+import { RESIDENT_PICK, postResidentLines, voidResidentLines } from "@/lib/journal-residents";
 
 const lineSchema = z.object({
+  // An account, or a resident's debtor account as RESIDENT_PICK + resident id.
   accountId: z.string().min(1),
   debit: z.string().default("0"),
   credit: z.string().default("0"),
@@ -47,11 +50,29 @@ function validateLines(lines: z.infer<typeof lineSchema>[]) {
   return cleaned;
 }
 
+/** Lines as stored: a resident's line goes on the AR control account, tagged with the resident. */
+async function toStoredLines(lines: ReturnType<typeof validateLines>) {
+  const residentIds = lines.filter((l) => l.accountId.startsWith(RESIDENT_PICK)).map((l) => l.accountId.slice(RESIDENT_PICK.length));
+  if (!residentIds.length) return lines.map((l, i) => ({ ...l, residentId: null, lineNo: i + 1 }));
+  const [ar, residents] = await Promise.all([
+    controlAccount("AR"),
+    db.resident.findMany({ where: { id: { in: residentIds } }, select: { id: true, debtorCode: true, ownerName: true } }),
+  ]);
+  const byId = new Map(residents.map((r) => [r.id, r]));
+  return lines.map((l, i) => {
+    if (!l.accountId.startsWith(RESIDENT_PICK)) return { ...l, residentId: null, lineNo: i + 1 };
+    const r = byId.get(l.accountId.slice(RESIDENT_PICK.length));
+    if (!r) throw new Error("A debtor account on this voucher is no longer in the system");
+    // The G/L shows only the control account, so the memo says whose account it is.
+    return { ...l, accountId: ar.id, residentId: r.id, memo: l.memo || `${r.debtorCode ?? ""} ${r.ownerName}`.trim(), lineNo: i + 1 };
+  });
+}
+
 export async function saveDraft(input: EntryInput) {
   return attempt(async () => {
     await requirePosting();
     const data = entrySchema.parse(input);
-    const cleaned = validateLines(data.lines);
+    const cleaned = await toStoredLines(validateLines(data.lines));
 
     if (data.id) {
       const existing = await db.journalEntry.findUnique({ where: { id: data.id } });
@@ -67,7 +88,7 @@ export async function saveDraft(input: EntryInput) {
             description: data.description,
             reference: data.reference,
             lines: {
-              create: cleaned.map((l, i) => ({ ...l, lineNo: i + 1 })),
+              create: cleaned,
             },
           },
         }),
@@ -87,7 +108,7 @@ export async function saveDraft(input: EntryInput) {
         description: data.description,
         reference: data.reference,
         status: "DRAFT",
-        lines: { create: cleaned.map((l, i) => ({ ...l, lineNo: i + 1 })) },
+        lines: { create: cleaned },
       },
     });
     revalidatePath("/journal");
@@ -108,10 +129,13 @@ export async function postEntry(id: string) {
       credit: l.credit.toString(),
       memo: l.memo ?? undefined,
     })));
-    await db.journalEntry.update({
-      where: { id },
-      data: { status: "POSTED", postedAt: new Date() },
-    });
+    await db.$transaction(async (tx) => {
+      await tx.journalEntry.update({
+        where: { id },
+        data: { status: "POSTED", postedAt: new Date() },
+      });
+      await postResidentLines(tx, entry);
+    }, { timeout: 30_000 }); // a voucher may carry many residents' lines
     revalidatePath("/journal");
     revalidatePath(`/journal/${id}`);
   });
@@ -143,11 +167,13 @@ export async function voidEntry(id: string, reason: string) {
               debit: l.credit,
               credit: l.debit,
               memo: l.memo,
+              residentId: l.residentId,
               lineNo: i + 1,
             })),
           },
         },
       });
+      await voidResidentLines(tx, entry.id);
       await tx.journalEntry.update({
         where: { id },
         data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason },

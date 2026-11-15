@@ -14,6 +14,7 @@ import { Empty } from "@/components/empty";
 import { Receipt as ReceiptIcon } from "lucide-react";
 import { ResidentPicker } from "./resident-picker";
 import { requireReport } from "@/lib/screen-guard";
+import { NON_CASH_METHODS } from "@/lib/journal-residents";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function PaymentHistoryPage({
   const receipts = residentId
     ? await db.receipt.findMany({
         where: {
-          residentId, method: { not: "CREDIT_NOTE" },
+          residentId, method: { notIn: NON_CASH_METHODS },
           ...(from || to ? { date: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } } : {}),
         },
         orderBy: { date: "asc" },
