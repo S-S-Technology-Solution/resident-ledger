@@ -17,7 +17,7 @@ import { unwrap } from "@/lib/action";
 import { REPORTS, SCREENS, reportScreen } from "@/lib/screens";
 import { fmtPhone } from "@/lib/phone";
 
-type User = { id: string; name: string; phone: string | null; email: string | null; role: UserRole; allScreens: boolean; screens: string[] };
+type User = { id: string; name: string; phone: string | null; email: string | null; role: UserRole; allScreens: boolean; screens: string[]; canExport: boolean };
 
 const ROLES: { value: UserRole; label: string; hint: string }[] = [
   { value: "ADMIN", label: "Administrator", hint: "Everything, including users, settings and year-end" },
@@ -34,6 +34,7 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
   const [role, setRole] = useState<UserRole>(user?.role ?? "TREASURER");
   const [password, setPassword] = useState("");
   const [allScreens, setAllScreens] = useState(user?.allScreens ?? true);
+  const [canExport, setCanExport] = useState(user?.canExport ?? true);
   // Screen keys, plus "report:<key>" for each report ticked under Reports.
   const [screens, setScreens] = useState<string[]>(user?.screens ?? []);
   const toggleScreen = (k: string) =>
@@ -50,7 +51,7 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
     start(async () => {
       try {
         const sent = someReports ? screens : pickedScreens;
-        await unwrap(upsertUser({ id: user?.id, name, phone, email, role, password: password || "", allScreens, screens: sent }));
+        await unwrap(upsertUser({ id: user?.id, name, phone, email, role, password: password || "", allScreens, screens: sent, canExport }));
         toast.success(mode === "create" ? "User added" : "User updated");
         setOpen(false);
         setPassword("");
@@ -165,6 +166,12 @@ export function UserDialog({ mode, user }: { mode: "create" | "edit"; user?: Use
                   : "The role still decides what they can change on each screen."}
               </p>
             </fieldset>
+          )}
+          {role !== "ADMIN" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={canExport} onChange={(e) => setCanExport(e.target.checked)} />
+              Allow export (PDF, Excel) and print
+            </label>
           )}
           <div className="space-y-1">
             <Label htmlFor="u-pass">

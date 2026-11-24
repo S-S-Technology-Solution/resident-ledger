@@ -22,6 +22,7 @@ const schema = z.object({
   role: z.enum(["ADMIN", "TREASURER", "VIEWER"]),
   password: z.string().min(8, "Use at least 8 characters").optional().or(z.literal("")),
   allScreens: z.boolean().default(true),
+  canExport: z.boolean().default(true),
   screens: z.array(z.string().refine((k) => SCREEN_VALUES.includes(k), "Unknown screen")).default([]),
 }).refine((d) => d.phone || d.email, {
   message: "Enter a phone number or an email address to sign in with.",
@@ -76,14 +77,16 @@ export async function upsertUser(input: z.infer<typeof schema>) {
           role: data.role,
           allScreens: data.role === "ADMIN" || data.allScreens,
           screens,
+          canExport: data.role === "ADMIN" || data.canExport,
           ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}),
         },
       });
       await recordAudit("user", data.id, "update", {
-        before: { phone: existing.phone, email: existing.email, role: existing.role, allScreens: existing.allScreens, screens: existing.screens },
+        before: { phone: existing.phone, email: existing.email, role: existing.role, allScreens: existing.allScreens, screens: existing.screens, canExport: existing.canExport },
         after: {
           phone, email, role: data.role, passwordChanged: Boolean(data.password),
           allScreens: data.role === "ADMIN" || data.allScreens, screens,
+          canExport: data.role === "ADMIN" || data.canExport,
         },
       });
     } else {
@@ -98,11 +101,12 @@ export async function upsertUser(input: z.infer<typeof schema>) {
           role: data.role,
           allScreens: data.role === "ADMIN" || data.allScreens,
           screens,
+          canExport: data.role === "ADMIN" || data.canExport,
           passwordHash: await bcrypt.hash(data.password, 10),
         },
       });
       await recordAudit("user", created.id, "create", {
-        after: { phone, email, role: data.role, allScreens: data.allScreens, screens, createdBy: admin.email ?? admin.phone },
+        after: { phone, email, role: data.role, allScreens: data.allScreens, screens, canExport: data.role === "ADMIN" || data.canExport, createdBy: admin.email ?? admin.phone },
       });
     }
 

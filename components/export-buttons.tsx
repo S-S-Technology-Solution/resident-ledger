@@ -2,6 +2,7 @@
 
 import { FileDown, Sheet, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCanExport } from "@/components/export-access";
 
 export function ExportButtons({
   slug,
@@ -10,6 +11,9 @@ export function ExportButtons({
   slug: string;
   params?: Record<string, string | undefined>;
 }) {
+  const allowed = useCanExport();
+  if (!allowed) return null;
+
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
   const make = (fmt: "pdf" | "xlsx") => {

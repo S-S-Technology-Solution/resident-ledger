@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildXlsx } from "@/lib/export/excel";
 import { buildPdf } from "@/lib/export/pdf";
 import { EXPORTS } from "@/lib/export/registry";
-import { getCurrentUser } from "@/lib/permissions";
+import { canExport, getCurrentUser } from "@/lib/permissions";
 import { canOpenReport, canSeeScreen } from "@/lib/screens";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const allowed = user && user.active && (def.screen === "reports" ? canOpenReport(user, slug, record) : canSeeScreen(user, def.screen));
   if (!allowed) {
     return NextResponse.json({ error: "You don't have access to this screen." }, { status: 403 });
+  }
+  if (!canExport(user)) {
+    return NextResponse.json({ error: "Your account cannot export." }, { status: 403 });
   }
   const format = (sp.get("format") ?? "pdf").toLowerCase();
   try {

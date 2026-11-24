@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { db } from "@/lib/db";
 import { DEFAULT_ASSOCIATION_ID } from "@/lib/association";
-import { getCurrentUser, ROLE_LABEL, ROLE_DESCRIPTION } from "@/lib/permissions";
+import { canExport, getCurrentUser, ROLE_LABEL, ROLE_DESCRIPTION } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { DataCard } from "@/components/data-card";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +80,7 @@ export default async function UsersPage() {
                   {u.role === "ADMIN" || u.allScreens
                     ? "All"
                     : screenSummary(u.screens)}
+                  {!canExport(u) && <div>No export or print</div>}
                 </TableCell>
                 <TableCell>
                   {u.active ? <Badge>Active</Badge> : <Badge variant="outline">Disabled</Badge>}
@@ -92,7 +93,7 @@ export default async function UsersPage() {
                     <>
                       <UserDialog
                         mode="edit"
-                        user={{ id: u.id, name: u.name, phone: u.phone, email: u.email, role: u.role, allScreens: u.allScreens, screens: u.screens }}
+                        user={{ id: u.id, name: u.name, phone: u.phone, email: u.email, role: u.role, allScreens: u.allScreens, screens: u.screens, canExport: u.canExport }}
                       />
                       {u.id !== me?.id && <ToggleUserButton id={u.id} active={u.active} />}
                     </>

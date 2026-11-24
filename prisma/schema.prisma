@@ -165,6 +165,8 @@ model User {
   // entries limit it to those reports.
   allScreens    Boolean     @default(true)
   screens       String[]    @default([])
+  // PDF/Excel downloads and printing. Administrators always may.
+  canExport     Boolean     @default(true)
   associationId String
   association   Association @relation(fields: [associationId], references: [id])
   createdAt     DateTime    @default(now())

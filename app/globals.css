@@ -106,6 +106,8 @@ body {
   @page { size: A4; margin: 15mm; }
   .no-print, header.no-print, nav, aside, [data-sonner-toaster] { display: none !important; }
   body { background: white !important; }
+  /* Users without export access get a blank page. */
+  html[data-no-export] body { display: none !important; }
   main { max-width: none !important; padding: 0 !important; }
   .print-receipt { box-shadow: none !important; border: 0 !important; }
   .print-receipt > header {

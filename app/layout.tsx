@@ -3,9 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { DesktopSidebar } from "@/components/sidebar-nav";
 import { Topbar } from "@/components/topbar";
+import { ExportAccessProvider } from "@/components/export-access";
 import { BackButton } from "@/components/back-button";
 import { currentSession } from "@/lib/auth";
-import { getCurrentUser } from "@/lib/permissions";
+import { canExport, getCurrentUser } from "@/lib/permissions";
 import { clearSessionCookie } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SCREENS, canSeeScreen } from "@/lib/screens";
@@ -26,6 +27,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // user deactivated mid-session would keep read access until it expired. Catch
   // that here, where the database is reachable.
   let allowed = SCREENS.map((s) => s.key);
+  let exportAllowed = true;
   if (session) {
     const user = await getCurrentUser().catch(() => null);
     if (!user || !user.active) {
@@ -34,10 +36,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     }
     // The menu lists only screens this user may open; each page checks again.
     allowed = allowed.filter((k) => canSeeScreen(user, k));
+    exportAllowed = canExport(user);
   }
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" data-no-export={exportAllowed ? undefined : ""} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full bg-background text-foreground">
         {session ? (
           <div className="flex min-h-screen">
@@ -47,7 +50,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
                 <div className="mx-auto w-full max-w-6xl">
                   <BackButton />
-                  {children}
+                  <ExportAccessProvider allowed={exportAllowed}>{children}</ExportAccessProvider>
                 </div>
               </main>
             </div>

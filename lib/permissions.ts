@@ -23,6 +23,7 @@ export type CurrentUser = {
   active: boolean;
   allScreens: boolean;
   screens: string[];
+  canExport: boolean;
 };
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -30,7 +31,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!session) return null;
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, name: true, phone: true, email: true, role: true, active: true, allScreens: true, screens: true },
+    select: { id: true, name: true, phone: true, email: true, role: true, active: true, allScreens: true, screens: true, canExport: true },
   });
   return user ?? null;
 }
@@ -41,6 +42,11 @@ export function canPost(role: UserRole) {
 
 export function canAdminister(role: UserRole) {
   return role === "ADMIN";
+}
+
+/** May download PDF/Excel files and print. */
+export function canExport(user: Pick<CurrentUser, "role" | "canExport">) {
+  return user.role === "ADMIN" || user.canExport;
 }
 
 /** Throws unless the signed-in user may post transactions. */
