@@ -15,7 +15,6 @@ import { BookOpen } from "lucide-react";
 import { requireReport } from "@/lib/screen-guard";
 import { canSeeReport } from "@/lib/screens";
 import { DrillLink } from "@/components/drill-link";
-import { entryHref } from "@/lib/drill";
 
 export const dynamic = "force-dynamic";
 
@@ -93,8 +92,8 @@ export default async function GLPage({
                 <TableRow key={i}>
                   <TableCell>{format(r.date, "dd/MM/yyyy")}</TableCell>
                   <TableCell className="font-mono text-xs">{r.batch}</TableCell>
-                  <TableCell className="font-mono text-xs"><DrillLink href={entryHref(r.entryId)}>{r.ref}</DrillLink></TableCell>
-                  <TableCell className="whitespace-normal"><DrillLink href={entryHref(r.entryId)}>{r.description}</DrillLink></TableCell>
+                  <TableCell className="font-mono text-xs"><DrillLink href={r.href}>{r.ref}</DrillLink></TableCell>
+                  <TableCell className="whitespace-normal"><DrillLink href={r.href}>{r.description}</DrillLink></TableCell>
                   <TableCell className="text-right font-mono tabular">{r.debit.gt(0) ? fmtRM(r.debit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{r.credit.gt(0) ? fmtRM(r.credit) : ""}</TableCell>
                   <TableCell className="text-right font-mono tabular">{side(r.balance)}</TableCell>
@@ -152,9 +151,9 @@ function ViewLedger({ s }: { s: LedgerSection }) {
             <TableRow key={i}>
               <TableCell>{format(r.date, "dd/MM/yyyy")}</TableCell>
               <TableCell className="text-center font-mono">{r.type}</TableCell>
-              <TableCell className="font-mono text-xs"><DrillLink href={entryHref(r.entryId)}>{r.ref}</DrillLink></TableCell>
+              <TableCell className="font-mono text-xs"><DrillLink href={r.href}>{r.ref}</DrillLink></TableCell>
               <TableCell className="font-mono text-xs">{r.chequeNo}</TableCell>
-              <TableCell className="whitespace-normal"><DrillLink href={entryHref(r.entryId)}>{r.description1}</DrillLink></TableCell>
+              <TableCell className="whitespace-normal"><DrillLink href={r.href}>{r.description1}</DrillLink></TableCell>
               <TableCell className="whitespace-normal text-muted-foreground">{r.description2}</TableCell>
               <TableCell className="text-right font-mono tabular">{r.debit.gt(0) ? fmtRM(r.debit) : ""}</TableCell>
               <TableCell className="text-right font-mono tabular">{r.credit.gt(0) ? fmtRM(r.credit) : ""}</TableCell>

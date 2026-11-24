@@ -1,7 +1,21 @@
 import Decimal from "decimal.js";
+import { format } from "date-fns";
 import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
 import { postChargesBulk } from "./charge-posting";
+
+const FEE_PERIOD = /^Monthly fee — (\d{4})-(\d{2})$/;
+
+/** How a month's fee is described on each owner's bill: "Monthly fee — 2026-01". */
+export function monthlyFeeDescription(year: number, month: number) {
+  return `Monthly fee — ${year}-${String(month).padStart(2, "0")}`;
+}
+
+/** The month a bill described as above is for, as "Jan"; null for any other description. */
+export function monthlyFeeMonth(description: string) {
+  const m = description.match(FEE_PERIOD);
+  return m ? format(new Date(Number(m[1]), Number(m[2]) - 1, 1), "MMM") : null;
+}
 
 /**
  * Raises one month's fee for every active resident who has a fee and hasn't
@@ -29,7 +43,7 @@ export async function generateMonthlyFees(
     periodMonth,
     periodYear,
     amount: new Decimal(r.monthlyFee.toString()).toFixed(2),
-    description: `Monthly fee — ${periodYear}-${String(periodMonth).padStart(2, "0")}`,
+    description: monthlyFeeDescription(periodYear, periodMonth),
   })), associationId);
   return { created, skipped: residents.length - due.length };
 }

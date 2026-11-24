@@ -12,6 +12,10 @@ export const glHref = (accountId: string, p: Period = {}) =>
 
 export const entryHref = (entryId: string) => `/reports/entry/${entryId}`;
 
+/** A month's fee bills, shown as one line in the fee income ledger. */
+export const feeBillsHref = (date: Date, description: string) =>
+  `/reports/fee-bills?${query({ date: date.toISOString().slice(0, 10), description })}`;
+
 export const debtorHref = (residentId: string, p: Period = {}) =>
   `/reports/debtor-ledger?${query({ kind: "debtor", id: residentId, from: p.from, to: p.to })}`;
 

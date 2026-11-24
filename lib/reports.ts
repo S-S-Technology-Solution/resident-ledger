@@ -1,6 +1,9 @@
 import Decimal from "decimal.js";
 import { db } from "./db";
 import { DEFAULT_ASSOCIATION_ID } from "./association";
+import { controlAccountCodes } from "./control-accounts";
+import { entryHref, feeBillsHref } from "./drill";
+import { monthlyFeeMonth } from "./monthly-fees";
 import type { AccountType } from "@prisma/client";
 
 type Range = { from?: Date; to?: Date };
@@ -163,7 +166,9 @@ export type LedgerSection = {
   /** Balance brought forward, debit-positive. */
   opening: Decimal;
   rows: {
-    entryId: string; date: Date; batch: string; ref: string;
+    /** What the line opens: its entry, or the bills behind a month's fees. */
+    href: string;
+    date: Date; batch: string; ref: string;
     /** Entry description with the line's memo appended, as the printed ledger shows it. */
     description: string;
     /** The two halves the view-ledger screen shows separately. */
@@ -181,6 +186,7 @@ export type LedgerSection = {
  * ledger: each account opens with its balance brought forward to the start of
  * the period, then the period's entries with a running balance. Accounts with
  * a balance but no movement still appear, showing just the brought-forward line.
+ * On the fee income account a month's bills, one posting per owner, are one line.
  */
 export async function generalLedgerAll(range: Range & { accountId?: string } = {}): Promise<LedgerSection[]> {
   const accounts = await db.account.findMany({
@@ -203,6 +209,7 @@ export async function generalLedgerAll(range: Range & { accountId?: string } = {
     orderBy: [{ entry: { date: "asc" } }, { entry: { entryNo: "asc" } }, { lineNo: "asc" }],
   });
   const byAccount = Map.groupBy(lines, (l) => l.accountId);
+  const { INCOME_FEE } = await controlAccountCodes();
 
   // Cheque numbers live on the document each entry was posted from.
   const entryIds = [...new Set(lines.map((l) => l.entryId))];
@@ -224,19 +231,34 @@ export async function generalLedgerAll(range: Range & { accountId?: string } = {
       const opening = openingOf.get(account.id) ?? new Decimal(0);
       let running = opening;
       let debit = new Decimal(0), credit = new Decimal(0);
-      const rows = (byAccount.get(account.id) ?? []).map((l) => {
-        const d = new Decimal(l.debit.toString()), c = new Decimal(l.credit.toString());
+      const own = byAccount.get(account.id) ?? [];
+      const runKey = (l: (typeof own)[number]) => `${l.entry.date.toISOString()} ${l.entry.description}`;
+      const runs = Map.groupBy(
+        own.filter((l) => account.code === INCOME_FEE && l.entry.source === "charge" && monthlyFeeMonth(l.entry.description)),
+        runKey,
+      );
+      const rows = own.flatMap((l) => {
+        const run = l.entry.source === "charge" ? runs.get(runKey(l)) : undefined;
+        // A month's bills appear once, where the first of them stands.
+        if (run && run[0] !== l) return [];
+        const summed = run && run.length > 1 ? run : null;
+        const total = (side: "debit" | "credit") =>
+          (summed ?? [l]).reduce((s, x) => s.plus(x[side].toString()), new Decimal(0));
+        const d = total("debit"), c = total("credit");
         running = running.plus(d).minus(c);
         debit = debit.plus(d); credit = credit.plus(c);
         // A line memo that only repeats the entry's description adds nothing.
         const memo = l.memo?.trim() && l.memo.trim() !== l.entry.description.trim() ? l.memo.trim() : "";
+        const description = summed
+          ? `${monthlyFeeMonth(l.entry.description)} ${account.name.toLowerCase()}`
+          : l.entry.description;
         return {
-          entryId: l.entryId,
+          href: summed ? feeBillsHref(l.entry.date, l.entry.description) : entryHref(l.entryId),
           date: l.entry.date,
           batch: l.entry.batch?.batchNo ?? "",
-          ref: l.entry.reference ?? l.entry.entryNo,
-          description: memo ? `${l.entry.description} — ${memo}` : l.entry.description,
-          description1: l.entry.description,
+          ref: summed ? `${summed.length} invoices` : l.entry.reference ?? l.entry.entryNo,
+          description: memo ? `${description} — ${memo}` : description,
+          description1: description,
           description2: memo,
           type: ledgerType(l.entry.source, cashDirection.get(l.entryId)),
           chequeNo: chequeOf.get(l.entryId) ?? "",
